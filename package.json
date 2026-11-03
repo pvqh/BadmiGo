@@ -1,0 +1,34 @@
+{
+  "name": "badminton-ladder-app",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo start --ios",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "simulate": "vitest run src/simulation",
+    "smoke": "node scripts/smoke.ts",
+    "types:db": "supabase gen types typescript --local --schema public > src/data/database.types.ts"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "^2.118.0",
+    "expo": "~58.0.22",
+    "expo-status-bar": "~58.0.4",
+    "openskill": "^4.0.3",
+    "react": "19.3.0",
+    "react-native": "0.88.1"
+  },
+  "devDependencies": {
+    "@types/react": "~19.3.0",
+    "supabase": "^3.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "^3.2.4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

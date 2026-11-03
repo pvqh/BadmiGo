@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Badminton Ladder",
+    "slug": "badminton-ladder",
+    "scheme": "badmintonladder",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "platforms": [
+      "ios"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.pvqh.badmintonladder",
+      "supportsTablet": false
+    }
+  }
+}
