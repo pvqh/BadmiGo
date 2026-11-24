@@ -58,7 +58,6 @@ function Routes() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="game/[id]" options={{ title: 'Game' }} />
         <Stack.Screen name="player/[id]" options={{ title: '' }} />
-        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       </Stack.Protected>
 
       <Stack.Protected guard={status === 'needs-profile'} redirectTo={home}>

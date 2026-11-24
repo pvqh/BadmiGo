@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link, Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { colour, font, space } from '../../src/ui/theme';
+import { colour } from '../../src/ui/theme';
 
 /** The tab bar hands down a colour that may be null; the palette never is. */
 function icon(name: ComponentProps<typeof Ionicons>['name']) {
@@ -31,17 +31,9 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="me"
-        options={{
-          title: '',
-          tabBarLabel: 'Me', 
-          tabBarIcon: icon('person'),
-          headerRight: () => (
-            <Link href="/settings" style={[font.body, { color: colour.accent, paddingHorizontal: space.page }]}>
-              Settings
-            </Link>
-          ),
-        }}
+        options={{ title: '', tabBarLabel: 'Me', tabBarIcon: icon('person') }}
       />
+      <Tabs.Screen name="settings" options={{ title: 'Cài đặt', tabBarIcon: icon('settings') }} />
     </Tabs>
   );
 }

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { Gender } from '../../src/data/auth';
 import type { LadderEntry } from '../../src/data/ladder';
@@ -9,8 +9,11 @@ import { Nothing, Pending, Problem } from '../../src/ui/components/async';
 import { PlacementBadge, TierBadge } from '../../src/ui/components/badge';
 import { Choice } from '../../src/ui/components/field';
 import { PendingBanner } from '../../src/ui/components/pending-banner';
+import { Podium } from '../../src/ui/components/podium';
+import { StandingCard } from '../../src/ui/components/standing-card';
 import { useLadder, usePendingGames, useReplayState } from '../../src/ui/queries';
 import { useMember } from '../../src/ui/session';
+import { standingOf } from '../../src/ui/standing';
 import { colour, font, layout, space } from '../../src/ui/theme';
 
 type Filter = 'all' | Gender;
@@ -26,6 +29,7 @@ export default function Ladder() {
   const me = useMember();
   const [filter, setFilter] = useState<Filter>('all');
   const [showAway, setShowAway] = useState(false);
+  const list = useRef<FlatList<LadderEntry>>(null);
 
   const ladder = useLadder();
   const replay = useReplayState();
@@ -43,6 +47,14 @@ export default function Ladder() {
   const ranked = shown.filter((entry) => isAround(entry, now) && !entry.in_placement);
   const placing = shown.filter((entry) => isAround(entry, now) && entry.in_placement);
   const away = shown.filter((entry) => !isAround(entry, now));
+  const standing = standingOf(ranked, me.id);
+  // The podium is the whole club's; the men's and women's splits read as plain lists.
+  const podiumSize = filter === 'all' ? 3 : 0;
+
+  const scrollToRank = (rank: number) =>
+    rank <= podiumSize
+      ? list.current?.scrollToOffset({ offset: 0 })
+      : list.current?.scrollToIndex({ index: rank - podiumSize - 1, viewPosition: 0.5 });
 
   const row = (entry: LadderEntry, rank?: number) => (
     <Row
@@ -58,7 +70,9 @@ export default function Ladder() {
     <FlatList
       ItemSeparatorComponent={() => <View style={layout.rule} />}
       ListEmptyComponent={
-        <Nothing message="Nobody is ranked yet. Log a game and the ladder starts." />
+        ranked.length === 0 ? (
+          <Nothing message="Nobody is ranked yet. Log a game and the ladder starts." />
+        ) : undefined
       }
       ListHeaderComponent={
         <View style={{ gap: space.gap, paddingBottom: space.row }}>
@@ -68,7 +82,7 @@ export default function Ladder() {
           <Choice
             onChange={setFilter}
             options={[
-              { value: 'all', label: 'Everyone' },
+              { value: 'all', label: 'Mọi người' },
               { value: 'male', label: 'Men' },
               { value: 'female', label: 'Women' },
             ]}
@@ -76,8 +90,18 @@ export default function Ladder() {
           />
           {replay.data?.last_replay_at == null ? null : (
             <Text style={font.dim}>
-              {`Updated ${describeRebuild(replay.data.last_replay_at, now)}. New results show up within a few minutes of being confirmed.`}
+              {`Updated ${describeRebuild(replay.data.last_replay_at, now)}. `}
             </Text>
+          )}
+          {standing === null ? null : (
+            <StandingCard onPress={() => scrollToRank(standing.rank)} standing={standing} />
+          )}
+          {podiumSize === 0 ? null : (
+            <Podium
+              leaders={ranked.slice(0, podiumSize)}
+              myId={me.id}
+              onOpen={(profileId) => router.push(`/player/${profileId}`)}
+            />
           )}
         </View>
       }
@@ -109,8 +133,13 @@ export default function Ladder() {
         </View>
       }
       contentContainerStyle={layout.page}
-      data={ranked}
+      data={ranked.slice(podiumSize)}
       keyExtractor={(entry) => entry.profile_id}
+      // Rows are measured lazily, so a far-down row may not exist yet; land near it.
+      onScrollToIndexFailed={({ index, averageItemLength }) =>
+        list.current?.scrollToOffset({ offset: index * averageItemLength })
+      }
+      ref={list}
       refreshControl={
         <RefreshControl
           onRefresh={() => void ladder.refetch()}
@@ -118,7 +147,7 @@ export default function Ladder() {
           tintColor={colour.dim}
         />
       }
-      renderItem={({ item, index }) => row(item, index + 1)}
+      renderItem={({ item, index }) => row(item, index + podiumSize + 1)}
       style={layout.screen}
     />
   );

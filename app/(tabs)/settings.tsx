@@ -1,14 +1,14 @@
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ScrollView, Switch, Text, View } from 'react-native';
-import { changePassword, signOut } from '../src/data/auth';
-import type { Preferences } from '../src/data/notifications';
-import { Pending, Problem } from '../src/ui/components/async';
-import { Button } from '../src/ui/components/button';
-import { Field } from '../src/ui/components/field';
-import { usePreferences, useUpdatePreferences } from '../src/ui/queries';
-import { useMember } from '../src/ui/session';
-import { colour, font, layout, space } from '../src/ui/theme';
+import { changePassword, signOut } from '../../src/data/auth';
+import type { Preferences } from '../../src/data/notifications';
+import { Pending, Problem } from '../../src/ui/components/async';
+import { Button } from '../../src/ui/components/button';
+import { Field } from '../../src/ui/components/field';
+import { usePreferences, useUpdatePreferences } from '../../src/ui/queries';
+import { useMember } from '../../src/ui/session';
+import { colour, font, layout, space } from '../../src/ui/theme';
 
 const MIN_PASSWORD = 8;
 
