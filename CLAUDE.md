@@ -1,0 +1,144 @@
+# Badminton Club Ladder — project instructions
+
+Read this file and `docs/SPEC.md` before writing any code. They are the contract.
+If something you are about to build is not in the spec, stop and ask.
+
+## What this is
+
+A free iOS app for one badminton community (~30 players, two 2-hour sessions every
+Saturday and Sunday, ~300 rated doubles games per month). Players log their doubles
+games, the other participants confirm, an OpenSkill rating moves, and a home-screen
+widget shows the ladder.
+
+Not a commercial product. There is no monetisation in scope and no payer to design
+for. Do not propose pricing, growth features, or onboarding funnels.
+
+## Hard rules
+
+These are not style preferences. Breaking one is a bug.
+
+1. **Games are the source of truth. Ratings are derived.**
+   Never write a rating as an authoritative value. Every rating in the database is
+   the output of replaying the full confirmed-game history through the engine. Any
+   code path that mutates a rating without a replay is wrong, no matter how small.
+
+2. **The domain core is pure.**
+   `src/domain/**` imports nothing from React, React Native, Expo, Supabase, or any
+   I/O library. It is plain TypeScript functions over plain data. This is the single
+   test seam (see `docs/SPEC.md` → Testing Decisions). Keep it that way.
+
+3. **Rating maths runs server-side only.**
+   The client proposes games; it never computes an authoritative rating. A patched
+   client must not be able to fake a ranking.
+
+4. **No feature from the Out of Scope list.**
+   It is in the spec's Out of Scope section for a reason that was argued through.
+
+5. **No rating-parameter change without a simulation run.**
+   Changing placement count, seed values, decay, or the display scale requires
+   re-running the simulation harness and reporting the before/after ranking
+   recovery. Do not tune these by intuition.
+
+## Anti-slop rules
+
+The author can read and tweak code but is not a professional developer. Code that
+looks impressive and cannot be maintained is worse than no code.
+
+- **No speculative abstraction.** No interface with one implementation. No
+  `manager`/`helper`/`util` grab-bag files. No config object for a thing with one
+  caller. Build the concrete case; abstract on the third repetition, not the first.
+- **No file over ~300 lines.** If one grows past that, it is doing two jobs.
+- **Strict TypeScript, no `any`, no non-null `!` assertions.** If a type is hard,
+  the data model is probably wrong — say so instead of casting.
+- **No new dependency without a one-line justification** recorded in the Decision
+  Log below. Prefer the standard library and what is already installed.
+- **Comments say why, never what.** Delete any comment that restates the code.
+- **No dead code, no commented-out blocks, no `TODO` without an owner and a reason.**
+- **Match the surrounding file's style** rather than importing a new idiom.
+- **Write the domain-core test first.** Red, green, refactor. The `tdd` skill applies.
+- **Do not generate scaffolding "for later."** Empty folders, placeholder screens,
+  and stub services are slop. Build what the current task needs.
+- **When unsure between two designs, ask.** Do not build both and leave one unused.
+
+## Stack
+
+- Expo + React Native, TypeScript, **iOS only**.
+- Supabase free tier: Postgres, Auth, Realtime, Edge Functions.
+- `openskill.js` for the rating model, executed in an Edge Function.
+- Resend as SMTP for auth email. Supabase's built-in mailer is rate-limited to a
+  trickle and must not be relied on for password resets.
+- Widget: native WidgetKit extension in Swift via `expo-apple-targets`, sharing
+  data through an App Group.
+- Distribution: TestFlight only. Not the public App Store.
+- Apple Developer Program ($99/yr) is required — the App Group entitlement the
+  widget needs is unavailable to free personal teams. It is the project's only cost.
+
+## Glossary
+
+Use these words in code, schema, and UI. Do not invent synonyms.
+
+| Term | Meaning |
+|---|---|
+| **Game** | One badminton game to 31, 21, 15, or 11 points. The atomic rated unit. |
+| **Match** | Not used as a distinct concept. One logged record == one game. |
+| **Logger** | The player who entered a game. |
+| **Participant** | Any of the four players in a game. |
+| **Confirmation** | A participant's approval of a logged game. |
+| **Dispute** | A participant's rejection, which freezes the game. |
+| **Pending** | A logged game awaiting confirmation. Does not affect ratings. |
+| **Confirmed** | A game that has moved ratings. |
+| **Voided** | An admin-removed game. Excluded from replay. |
+| **mu / sigma** | OpenSkill's skill estimate and its uncertainty. |
+| **Display rating** | The player-facing number derived from mu and sigma. |
+| **Tier** | Newbie, Y, TB, TB+, Khá. Club vocabulary, see spec. |
+| **Seed tier** | The level a player declares at signup; sets starting mu only. |
+| **Placement** | A player's first 5 confirmed games; shown as provisional. |
+| **Replay** | Recomputing all ratings from the confirmed-game history. |
+| **PvE** | Performance vs expectation; a partner-independent secondary stat. |
+
+## Session start checklist
+
+1. Read `docs/SPEC.md`.
+2. Check the Decision Log below for anything that supersedes the spec.
+3. Do not re-litigate settled decisions. The spec records what was decided and why.
+
+## Decision Log
+
+Append-only. Newest last. One line each: date, decision, reason.
+
+- 2026-11-03 — Spec written from a five-round design interview. See `docs/SPEC.md`.
+- 2026-11-03 — Vitest as the test runner, not jest-expo: the only unit-tested code is the pure domain core, which needs no React Native transform.
+- 2026-11-03 — Scores to 15 and 11 end on win-by-two with a hard cap at 21 and 15 respectively; the spec had fixed a cap only for games to 21.
+- 2026-11-03 — `applyEvent` returns a result union rather than the spec's bare `(state, event) -> state`, so an illegal transition reports why instead of being silently dropped.
+- 2026-11-03 — A confirmed game cannot be disputed; admin correction or void is the only route, so auto-accept cannot be quietly undone after ratings have moved.
+- 2026-11-03 — Sigma inflation for an absence is applied when a returning player next plays, never while they are away, so replay stays a pure function of the game list and an idle player's rating is preserved exactly.
+- 2026-11-03 — Display scale z changed 3 to 1.5 after a simulation run: sigma plateaus near 5.2 at this club's volume rather than settling low, so z=3 flattened 24 of 150 simulated players to a display rating of zero.
+- 2026-11-03 — Tier bands confirmed by simulation as 400 / 600 / 880 / 1120, replacing the provisional 550 / 720 / 900 / 1120. Within-one-tier labelling 59% to 96%, exact tier 26% to 49%, players clipped to zero 24/150 to 0, over five seeds.
+- 2026-11-03 — Ranking recovery plateaus at Spearman ~0.85 once the club leaves placement and does not improve with more games; the ceiling is the carrying problem the spec anticipated, not a bug.
+- 2026-11-03 — SIGMA_RECOVERY_DAYS (21) remains provisional: the harness simulates one month and cannot yet exercise a long absence.
+- 2026-11-03 — A game is written by one `log_game` RPC rather than a client insert: supabase-js cannot open a transaction and a game is nine rows that must land together or not at all.
+- 2026-11-03 — `played_at` is the server clock, not a client parameter, so a replay can never be reordered from a phone; `created_at` is kept separately and runs the auto-accept clock, so backdating could not shorten anyone's twenty-four hours.
+- 2026-11-03 — Badminton score validity is NOT restated as a SQL constraint; `src/domain/validation` owns it and the social backstop (four public names, three confirmations, admin void) catches the rest, because one rule in two languages drifts. Only structural constraints are in the schema.
+- 2026-11-03 — Every status change goes through `persist_game_state`, service-role only, which is handed the state the decision was made from and rejects with serialization_failure if it moved; otherwise two participants confirming in the same moment would each write the other's answer back.
+- 2026-11-03 — Username-only accounts get a synthetic auth email derived from the handle (`<name>@users.badminton-ladder.invalid`), so sign-in needs no username-to-email lookup and no member's real address is exposed to handle guessing. Mirrored in `public.username_email_domain()` and `src/data/auth.ts`.
+- 2026-11-03 — No auth trigger creates profiles; username, email, Google and Apple all finish by calling `create_my_profile`, so there is one path to membership rather than one that works for two of the four.
+- 2026-11-03 — The spec's `notify-widget` is built as `notify-players`, carrying the confirmation request, the dispute alert and the silent widget wake behind one `kind`, because three near-identical push functions would be worse than one.
+- 2026-11-03 — `push_tokens` and `notification_preferences` added to the data model: the spec omits them but stories 22, 25 and 61 to 64 need somewhere to live. Overtaken-on-ladder defaults to off, per story 63.
+- 2026-11-03 — `player_ratings` stores `in_placement` and `last_played_at` straight off the engine, so the placement count stays a rating parameter in `rating-scale` instead of being restated in SQL, and activity can be measured against the current clock rather than a flag frozen at the last replay.
+- 2026-11-03 — Relative imports inside `src/domain` carry explicit `.ts` extensions, because that is the only way a Deno Edge Function can import the domain core directly and run the one true engine. Verified that the edge runtime does not honour Deno's `sloppy-imports`, and that the CLI will not even mount a file it cannot resolve.
+- 2026-11-03 — `log_game` requires the logger to be one of the four players, since the lifecycle counts them as confirmed implicitly and that only means something if they played.
+- 2026-11-03 — Dependencies added: `@supabase/supabase-js` (the `data` module), `@react-native-async-storage/async-storage` (so a member stays signed in), `supabase` CLI (dev only, runs the local stack and generates `database.types.ts`).
+- 2026-11-04 — Dependencies added for the app layer, author's choice: `expo-router` (file-based routing, and its peers `react-native-screens`, `react-native-safe-area-context`, `expo-linking`, `expo-constants`), `@tanstack/react-query` (server-state cache, so one place invalidates after a replay), `react-native-svg` (the rating graph is a line and needs a polyline), `@expo/vector-icons` (four tabs need icons).
+- 2026-11-04 — `react-dom` pinned to 19.3.0 by an npm `overrides` entry: expo-router pulls Radix's web tabs, whose react-dom resolves to 19.3.1 and demands react ^19.3.1 while Expo pins react 19.3.0, so every `npm install` failed until the two were locked together.
+- 2026-11-04 — The authoritative replay stays in `domain/rating`; the story-19 preview is a separate `domain/rating-preview`, so the untrusted path is obvious from the file name and the Edge Function keeps importing only the one true engine. Its test asserts the preview equals what a replay of the same game produces, so it cannot drift into lying.
+- 2026-11-04 — PvE is defined as wins above expectation where the player themselves is replaced by the average of every *other* rating in the club, so the figure is exactly independent of their own rating and cannot be inherited from a strong partner. The spec fixed the property, not the formula; this is the formula.
+- 2026-11-04 — `unwrap` is typed with supabase-js's own `PostgrestSingleResponse<T>` rather than a hand-written `{ data, error }`: with two independently nullable fields TypeScript infers a `.single()` query's row type as `null`, which silently gave every single-row caller a `never`.
+- 2026-11-04 — `src/data/database.types.ts` was stale: it lacked `game_confirmations.game_id -> games`, which the games migration declares and the feed query embeds through, so the feed's confirmations typed as a `SelectQueryError`. Patched by hand to match the migration; re-run `npm run types:db` once Docker is available and the hand edit disappears.
+- 2026-11-04 — `readAwaitingMyAnswer` became `readMyPendingGames`: the logger needs to reach their own pending game to cancel it (story 20), and who still owes an answer is already in the confirmations each row carries, so one query serves the banner and the cancel route rather than two that overlap.
+- 2026-11-04 — No Realtime subscriptions. No v1 story asks for a live-updating screen; the ladder and feed refresh on pull and on cache invalidation after an answer, and the widget is the ambient path. Adding sockets would be a second staleness model to reason about.
+- 2026-11-04 — One dark palette rather than light and dark, with `userInterfaceStyle` set to `dark` to match: two themes would double every screen's styling for thirty players.
+- 2026-11-04 — `vitest.config.ts` added to scope collection to `src/**`: a locked git worktree under `.claude/worktrees` holds a second copy of the repo, and vitest's defaults ran its tests alongside this checkout's. `tsconfig.json` excludes `.claude` for the same reason.
+- 2026-11-24 — Games to 31 added (story 16), capped at 40 on the 21→30 pattern; the `games_format_known` and `games_scores_in_range` constraints widened in a new migration.
+- 2026-11-24 — Placement shortened from 10 to 5 games, after a simulation run over five seeds: Spearman at the end of placement 0.825 → 0.852, reached after ~85 club games instead of ~134; a third into the month 29.4/30 players are ranked instead of 23.8, with recovery among them 0.828 → 0.842. Full-season recovery unchanged at 0.883.
+- 2026-11-24 — The tier the club calls "TB" is spelled TB, not TBY, in the glossary and on screen. The slug stays `tby` in code and the database, because renaming an enum value is a migration with no user-visible gain.
+- 2026-11-24 — A confirmed game's detail no longer lists who confirmed it (story 45); the per-player answers show only while the game is pending (story 29).

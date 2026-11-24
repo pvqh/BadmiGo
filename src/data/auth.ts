@@ -1,3 +1,4 @@
+import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { supabase, unwrap } from './client';
 import type { Database } from './database.types';
 import type { Tier } from '../domain/types';
@@ -42,6 +43,19 @@ export async function signInWithIdToken(
 ): Promise<void> {
   const { error } = await supabase.auth.signInWithIdToken({ provider, token });
   if (error !== null) throw new Error(error.message);
+}
+
+/**
+ * Who is signed in, now and whenever that changes. Reported as a bare id because the
+ * app above this module has no business holding a token. supabase-js replays the
+ * stored session to a new listener, so this is also how the app learns its state at
+ * launch rather than asking separately and racing itself.
+ */
+export function onAuthChange(listen: (userId: string | null) => void): () => void {
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    listen(session === null ? null : session.user.id);
+  });
+  return () => data.subscription.unsubscribe();
 }
 
 export async function signOut(): Promise<void> {
@@ -92,10 +106,35 @@ export async function createMyProfile(input: {
   );
 }
 
+/**
+ * The handle a username-only account is locked to, or null when the account has a
+ * real address and may still choose any free username. Mirrors the derivation inside
+ * public.create_my_profile, which ignores the username it is passed for these
+ * accounts precisely so the two can never disagree.
+ */
+export async function reservedUsername(): Promise<string | null> {
+  const { data } = await supabase.auth.getUser();
+  const email = data.user === null ? null : data.user.email;
+  if (email === undefined || email === null) return null;
+
+  const [handle, domain] = email.split('@');
+  return domain === USERNAME_EMAIL_DOMAIN ? handle : null;
+}
+
 /** Null while an account exists but has not finished signing up. */
 export async function myProfile(): Promise<Profile | null> {
-  const { data: session } = await supabase.auth.getUser();
-  if (session.user === null) return null;
+  const { data: session, error: authError } = await supabase.auth.getUser();
+  if (authError !== null) {
+    // A network failure must not read as "no profile", or a phone that lost signal
+    // would be sent to finish signing up.
+    if (!isAuthApiError(authError) && !isAuthSessionMissingError(authError)) {
+      throw new Error(authError.message);
+    }
+    // The server no longer knows this account (a db reset, a deleted user), so the
+    // session saved on the phone is stale; dropping it lands on the sign-in screen.
+    await supabase.auth.signOut({ scope: 'local' });
+    return null;
+  }
 
   const { data, error } = await supabase
     .from('profiles')

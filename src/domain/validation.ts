@@ -4,7 +4,7 @@ import type { GameFormat, ProfileId, Side } from './types.ts';
  * Setting starts one point below the target and a side must then lead by two,
  * except at the cap, where the next point simply wins.
  */
-const HARD_CAP: Record<GameFormat, number> = { 21: 30, 15: 21, 11: 15 };
+const HARD_CAP: Record<GameFormat, number> = { 31: 40, 21: 30, 15: 21, 11: 15 };
 
 export interface ProposedGame {
   readonly format: GameFormat;

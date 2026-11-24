@@ -11,10 +11,26 @@ export async function readLadder() {
     await supabase
       .from('player_ratings')
       .select(
-        'profile_id, display_rating, tier, games_played, in_placement, is_active, ' +
-          'last_played_at, profiles!inner (username, display_name, gender)',
+        // One literal, not a concatenation: supabase-js reads this string at the
+        // type level, and a joined string is just `string` to it.
+        `profile_id, display_rating, tier, games_played, in_placement, is_active,
+         last_played_at, profiles!inner (username, display_name, gender)`,
       )
       .order('display_rating', { ascending: false }),
+  );
+}
+
+/** A ladder row as the screen reads it, named off the query rather than restated. */
+export type LadderEntry = Awaited<ReturnType<typeof readLadder>>[number];
+
+/**
+ * The engine's own numbers for the whole club, which two screens need instead of the
+ * display rating: the log screen previews a prospective game, and a profile works
+ * out performance vs expectation. Thirty rows, so it is read whole.
+ */
+export async function readStrengths() {
+  return unwrap(
+    await supabase.from('player_ratings').select('profile_id, mu, sigma, last_played_at'),
   );
 }
 
@@ -58,6 +74,6 @@ export async function searchPlayers(term: string) {
       .select('id, username, display_name, gender')
       .or(`display_name.ilike.${pattern},username.ilike.${pattern}`)
       .order('display_name')
-      .limit(20),
+      .limit(50),
   );
 }

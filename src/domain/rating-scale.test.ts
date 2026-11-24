@@ -81,8 +81,8 @@ describe('tierFor', () => {
 });
 
 describe('placement', () => {
-  it('lasts ten games', () => {
-    expect(PLACEMENT_GAMES).toBe(10);
+  it('lasts five games', () => {
+    expect(PLACEMENT_GAMES).toBe(5);
   });
 });
 

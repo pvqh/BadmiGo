@@ -18,6 +18,12 @@ export type Database = {
                   }
                   Relationships: [
                     {
+      foreignKeyName: "game_confirmations_game_id_fkey"
+      columns: ["game_id"]
+isOneToOne: false
+      referencedRelation: "games"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "game_confirmations_game_id_profile_id_fkey"
       columns: ["game_id","profile_id"]
 isOneToOne: true

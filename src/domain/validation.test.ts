@@ -11,6 +11,11 @@ function game(fields: Partial<Parameters<typeof validateProposedGame>[0]> = {}) 
 describe('validateScore', () => {
   const cases: ReadonlyArray<readonly [GameFormat, readonly [number, number][], readonly [number, number][]]> = [
     [
+      31,
+      [[31, 0], [31, 29], [32, 30], [35, 33], [39, 37], [40, 39]],
+      [[31, 30], [31, 31], [30, 29], [32, 29], [40, 38], [41, 39], [21, 15]],
+    ],
+    [
       21,
       [[21, 0], [21, 19], [22, 20], [25, 23], [29, 27], [30, 29]],
       [[21, 20], [21, 21], [20, 19], [22, 19], [23, 20], [30, 28], [31, 29], [32, 30]],

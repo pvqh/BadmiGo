@@ -57,7 +57,8 @@ export async function answerGame(gameId: string, answer: Answer): Promise<Answer
 }
 
 const FEED_SHAPE = `
-  id, format, score_a, score_b, winning_side, played_at, status, photo_path, logger_id,
+  id, format, score_a, score_b, winning_side, played_at, created_at, status, void_reason,
+  photo_path, logger_id,
   game_participants (profile_id, side, profiles (username, display_name)),
   game_confirmations (profile_id, state, responded_at),
   rating_history (profile_id, display_before, display_after)
@@ -75,19 +76,31 @@ export async function readFeed(limit = 30, before?: string) {
   return unwrap(await (before === undefined ? query : query.lt('played_at', before)));
 }
 
+/**
+ * A game as every screen reads it: the row, its four players, their answers, and
+ * what it moved. Named off the query rather than restated, so a change to
+ * FEED_SHAPE reaches the screens through the compiler.
+ */
+export type GameRow = Awaited<ReturnType<typeof readFeed>>[number];
+
 export async function readGame(gameId: string) {
   return unwrap(await supabase.from('games').select(FEED_SHAPE).eq('id', gameId).single());
 }
 
-/** The banner on opening the app: games this member has not answered yet. */
-export async function readAwaitingMyAnswer(profileId: ProfileId) {
+/**
+ * Every pending game this member is in, newest first — the banner on opening the
+ * app, and the only route to a game the logger wants to cancel. Who still owes an
+ * answer is read from the confirmations already carried in each row, so the screen
+ * needs no second query to tell the two apart.
+ */
+export async function readMyPendingGames(profileId: ProfileId) {
   return unwrap(
     await supabase
-      .from('game_confirmations')
+      .from('game_participants')
       .select(`game_id, games!inner (${FEED_SHAPE})`)
       .eq('profile_id', profileId)
-      .eq('state', 'pending')
-      .eq('games.status', 'pending'),
+      .eq('games.status', 'pending')
+      .order('played_at', { referencedTable: 'games', ascending: false }),
   );
 }
 

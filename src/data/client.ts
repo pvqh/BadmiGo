@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type PostgrestSingleResponse } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Database } from './database.types';
 
@@ -35,13 +35,14 @@ export const supabase = createClient<Database>(
   },
 );
 
-interface Result<T> {
-  readonly data: T | null;
-  readonly error: { readonly message: string } | null;
-}
-
-/** Turns supabase-js's two-field result into a value or a throw, once, here. */
-export function unwrap<T>(result: Result<T>): T {
+/**
+ * Turns supabase-js's two-field result into a value or a throw, once, here.
+ *
+ * Typed with the library's own response rather than a hand-written `{ data, error }`:
+ * given two independently nullable fields, TypeScript infers a single-row query's
+ * row type as null, and every caller downstream silently ends up holding a `never`.
+ */
+export function unwrap<T>(result: PostgrestSingleResponse<T>): T {
   if (result.error !== null) throw new Error(result.error.message);
   if (result.data === null) throw new Error('the request succeeded but returned nothing');
   return result.data;

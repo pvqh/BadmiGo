@@ -11,7 +11,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** OpenSkill's library default, used for every player so a seed is only a hint. */
 export const SIGMA_INITIAL = 25 / 3;
 
-export const PLACEMENT_GAMES = 10;
+export const PLACEMENT_GAMES = 5;
 
 /** A player is off the ladder, and their sigma starts to widen, after this long away. */
 export const IDLE_GRACE_DAYS = 21;
