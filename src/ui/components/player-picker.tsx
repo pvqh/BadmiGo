@@ -48,8 +48,8 @@ export function PlayerPicker({
     .filter((player) => free(player) && !recents.some((recent) => recent.profileId === player.profileId));
 
   const sections = [
-    { title: 'Played with recently', data: recents },
-    { title: term.trim().length > 0 ? 'Matches' : 'Everyone', data: others },
+    { title: 'Chơi cùng gần đây', data: recents },
+    { title: term.trim().length > 0 ? 'Kết quả' : 'Mọi người', data: others },
   ].filter((section) => section.data.length > 0);
 
   const close = () => {
@@ -65,29 +65,29 @@ export function PlayerPicker({
       presentationStyle="pageSheet"
       visible={visible}
     >
-      <View style={[layout.screen, { backgroundColor: colour.deep, padding: space.page, gap: space.gap }]}>
+      <View style={[layout.screen, { padding: space.page, gap: space.gap }]}>
         <View style={layout.spread}>
-          <Text style={font.heading}>Add a player</Text>
+          <Text style={font.heading}>Thêm người chơi</Text>
           <Pressable accessibilityRole="button" hitSlop={12} onPress={close}>
-            <Text style={[font.body, { color: colour.accent }]}>Cancel</Text>
+            <Text style={[font.body, { color: colour.courtInk, fontWeight: '600' }]}>Huỷ</Text>
           </Pressable>
         </View>
 
         <View style={style.search}>
           <Ionicons color={colour.dim} name="search" size={18} />
           <TextInput
-            accessibilityLabel="Search players"
+            accessibilityLabel="Tìm người chơi"
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus
             onChangeText={setTerm}
-            placeholder="Search by name"
+            placeholder="Tìm theo tên"
             placeholderTextColor={colour.dim}
             style={[font.body, { flex: 1 }]}
             value={term}
           />
           {term.length === 0 ? null : (
-            <Pressable accessibilityLabel="Clear search" hitSlop={12} onPress={() => setTerm('')}>
+            <Pressable accessibilityLabel="Xoá tìm kiếm" hitSlop={12} onPress={() => setTerm('')}>
               <Ionicons color={colour.dim} name="close-circle" size={18} />
             </Pressable>
           )}
@@ -98,17 +98,17 @@ export function PlayerPicker({
           ListEmptyComponent={
             found.isPending ? undefined : (
               <Text style={font.dim}>
-                {`Nobody called "${term.trim()}". Everyone in a game needs an account, so send them the link below.`}
+                {`Không có ai tên "${term.trim()}". Ai chơi cũng cần có tài khoản, hãy gửi họ đường link bên dưới.`}
               </Text>
             )
           }
           ListFooterComponent={
             <View style={{ gap: space.tight, paddingVertical: space.gap }}>
               <Pressable accessibilityRole="button" onPress={() => invite.mutate()}>
-                <Text style={[font.body, { color: colour.accent }]}>Invite someone new</Text>
+                <Text style={[font.body, { color: colour.courtInk, fontWeight: '600' }]}>Mời người mới</Text>
               </Pressable>
               {invite.data === 'copied' ? (
-                <Text style={font.dim}>Link copied. Send it to them.</Text>
+                <Text style={font.dim}>Đã chép link. Gửi cho họ nhé.</Text>
               ) : null}
               {invite.isError ? (
                 <Text style={[font.dim, { color: colour.down }]}>{invite.error.message}</Text>
@@ -126,7 +126,7 @@ export function PlayerPicker({
               }}
               style={({ pressed }) => [style.option, pressed ? { opacity: 0.6 } : null]}
             >
-              <Text style={font.body}>{item.displayName}</Text>
+              <Text style={[font.body, { fontWeight: '600' }]}>{item.displayName}</Text>
             </Pressable>
           )}
           renderSectionHeader={({ section }) => (
@@ -149,7 +149,7 @@ async function shareInvite(): Promise<'shared' | 'copied' | 'cancelled'> {
   const url = `${window.location.origin}${process.env.EXPO_BASE_URL ?? ''}/sign-up`;
   if (typeof navigator.share === 'function') {
     try {
-      await navigator.share({ title: 'Join the badminton ladder', url });
+      await navigator.share({ title: 'Tham gia bảng xếp hạng cầu lông', url });
       return 'shared';
     } catch (error) {
       // Closing the share sheet without sending is a choice, not a failure.
@@ -196,6 +196,8 @@ const style = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: space.gap,
     borderRadius: radius.field,
-    backgroundColor: colour.raised,
+    backgroundColor: colour.card,
+    borderWidth: 1.5,
+    borderColor: colour.line,
   },
 });

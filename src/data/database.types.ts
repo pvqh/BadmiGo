@@ -59,14 +59,14 @@ isOneToOne: false
                   ]
                 },"games": {
                   Row: {
-                    "created_at": string,"format": number,"id": string,"logger_id": string,"photo_path": string | null,"played_at": string,"score_a": number,"score_b": number,"status": Database["public"]['Enums']["game_status"],"void_reason": string | null,"winning_side": Database["public"]['Enums']["side"] | null
+                    "created_at": string,"format": number,"id": string,"logger_id": string,"played_at": string,"score_a": number,"score_b": number,"status": Database["public"]['Enums']["game_status"],"void_reason": string | null,"winning_side": Database["public"]['Enums']["side"] | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"format": number,"id"?: string,"logger_id": string,"photo_path"?: string | null,"played_at"?: string,"score_a": number,"score_b": number,"status"?: Database["public"]['Enums']["game_status"],"void_reason"?: string | null,"winning_side"?: never
+                    "created_at"?: string,"format": number,"id"?: string,"logger_id": string,"played_at"?: string,"score_a": number,"score_b": number,"status"?: Database["public"]['Enums']["game_status"],"void_reason"?: string | null,"winning_side"?: never
                   }
                   Update: {
-                    "created_at"?: string,"format"?: number,"id"?: string,"logger_id"?: string,"photo_path"?: string | null,"played_at"?: string,"score_a"?: number,"score_b"?: number,"status"?: Database["public"]['Enums']["game_status"],"void_reason"?: string | null,"winning_side"?: never
+                    "created_at"?: string,"format"?: number,"id"?: string,"logger_id"?: string,"played_at"?: string,"score_a"?: number,"score_b"?: number,"status"?: Database["public"]['Enums']["game_status"],"void_reason"?: string | null,"winning_side"?: never
                   }
                   Relationships: [
                     {
@@ -119,14 +119,14 @@ isOneToOne: true
                   ]
                 },"profiles": {
                   Row: {
-                    "created_at": string,"display_name": string,"gender": Database["public"]['Enums']["gender"],"id": string,"is_admin": boolean,"seed_tier": Database["public"]['Enums']["tier"],"username": string
+                    "avatar_path": string | null,"created_at": string,"display_name": string,"gender": Database["public"]['Enums']["gender"],"id": string,"is_admin": boolean,"seed_tier": Database["public"]['Enums']["tier"],"username": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"display_name": string,"gender": Database["public"]['Enums']["gender"],"id": string,"is_admin"?: boolean,"seed_tier": Database["public"]['Enums']["tier"],"username": string
+                    "avatar_path"?: string | null,"created_at"?: string,"display_name": string,"gender": Database["public"]['Enums']["gender"],"id": string,"is_admin"?: boolean,"seed_tier": Database["public"]['Enums']["tier"],"username": string
                   }
                   Update: {
-                    "created_at"?: string,"display_name"?: string,"gender"?: Database["public"]['Enums']["gender"],"id"?: string,"is_admin"?: boolean,"seed_tier"?: Database["public"]['Enums']["tier"],"username"?: string
+                    "avatar_path"?: string | null,"created_at"?: string,"display_name"?: string,"gender"?: Database["public"]['Enums']["gender"],"id"?: string,"is_admin"?: boolean,"seed_tier"?: Database["public"]['Enums']["tier"],"username"?: string
                   }
                   Relationships: [
                     
@@ -217,8 +217,9 @@ isOneToOne: false
         isSetofReturn: true
       } },
 "create_my_profile":
-{ Args: { "p_display_name": string,"p_gender": Database["public"]['Enums']["gender"],"p_seed_tier": Database["public"]['Enums']["tier"] }; Returns: {
-              "created_at": string,
+{ Args: { "p_avatar_path"?: string,"p_display_name": string,"p_gender": Database["public"]['Enums']["gender"],"p_seed_tier": Database["public"]['Enums']["tier"] }; Returns: {
+              "avatar_path": string | null,
+"created_at": string,
 "display_name": string,
 "gender": Database["public"]['Enums']["gender"],
 "id": string,
@@ -245,7 +246,7 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
 "log_game":
-{ Args: { "p_format": number,"p_photo_path"?: string,"p_score_a": number,"p_score_b": number,"p_side_a": (string)[],"p_side_b": (string)[] }; Returns: string
+{ Args: { "p_format": number,"p_score_a": number,"p_score_b": number,"p_side_a": (string)[],"p_side_b": (string)[] }; Returns: string
                            },
 "merge_profiles":
 { Args: { "p_keep": string,"p_merge": string }; Returns: undefined

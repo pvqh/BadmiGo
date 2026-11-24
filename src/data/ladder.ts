@@ -14,7 +14,7 @@ export async function readLadder() {
         // One literal, not a concatenation: supabase-js reads this string at the
         // type level, and a joined string is just `string` to it.
         `profile_id, display_rating, tier, games_played, in_placement, is_active,
-         last_played_at, profiles!inner (username, display_name, gender)`,
+         last_played_at, profiles!inner (username, display_name, gender, avatar_path)`,
       )
       .order('display_rating', { ascending: false }),
   );
@@ -38,7 +38,7 @@ export async function readStrengths() {
 export async function readRating(profileId: ProfileId) {
   const { data, error } = await supabase
     .from('player_ratings')
-    .select('*, profiles!inner (username, display_name, gender, seed_tier)')
+    .select('*, profiles!inner (username, display_name, gender, seed_tier, avatar_path)')
     .eq('profile_id', profileId)
     .maybeSingle();
   if (error !== null) throw new Error(error.message);

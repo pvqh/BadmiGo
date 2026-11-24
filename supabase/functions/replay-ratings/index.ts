@@ -70,8 +70,8 @@ async function announcePasses(
     [...passed].map(([profileId, by]) => ({
       profileId,
       message: {
-        title: 'You were passed on the ladder',
-        body: `${by.map((id) => nameOf.get(id) ?? 'Someone').join(', ')} moved above you.`,
+        title: 'Bạn vừa bị vượt trên bảng xếp hạng',
+        body: `${by.map((id) => nameOf.get(id) ?? 'Ai đó').join(', ')} vừa vượt lên trên bạn.`,
         path: '',
       },
     })),

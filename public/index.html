@@ -15,15 +15,31 @@
     <link rel="apple-touch-icon" href="/BadmiGo/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Ladder" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="theme-color" content="#0e3b2e" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#EEF2EF" />
+    <link rel="stylesheet" href="/BadmiGo/fonts/fonts.css" />
+    <!--
+      Runs before the app arrives, so a phone that chose dark (Settings, kept under the
+      same key as src/ui/theme.ts) never flashes the light floor first.
+    -->
+    <script>
+      if (localStorage.getItem('badmigo.scheme') === 'dark') {
+        document.documentElement.className = 'dark';
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0C1612');
+      }
+    </script>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
       /* These styles make the body full-height */
       html,
       body {
         height: 100%;
-        background-color: #0e3b2e;
+        background-color: #EEF2EF;
+      }
+      html.dark,
+      html.dark body {
+        background-color: #0C1612;
+        color-scheme: dark;
       }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {

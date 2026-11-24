@@ -10,8 +10,8 @@ import { colour, font, layout, space } from '../../src/ui/theme';
 import { TIER_LABEL } from '../../src/ui/vocabulary';
 
 const FLAG_LABEL: Record<Flag, string> = {
-  disputed: 'Disputed. Fix the score, resolve it as logged, or remove it.',
-  'nobody-answered': 'Accepted by the 24-hour clock. Only the logger ever vouched for it.',
+  disputed: 'Bị phản đối. Sửa tỉ số, giữ nguyên như đã ghi, hoặc gỡ trận.',
+  'nobody-answered': 'Tự xác nhận sau 24 giờ. Chỉ người ghi xác nhận trận này.',
 };
 
 /**
@@ -40,13 +40,13 @@ export default function ClubAdmin() {
 
   return (
     <ScrollView contentContainerStyle={layout.page} style={layout.screen}>
-      <Text style={font.heading}>Needs a look</Text>
+      <Text style={font.heading}>Cần xem lại</Text>
       {flagged.length === 0 ? (
-        <Text style={font.dim}>Nothing flagged in the last month.</Text>
+        <Text style={font.dim}>Không có gì cần xem trong tháng qua.</Text>
       ) : (
         flagged.map(({ row, flag }) => (
           <View key={row.id} style={{ gap: space.tight }}>
-            <Text style={[font.dim, { color: colour.pending }]}>{FLAG_LABEL[flag]}</Text>
+            <Text style={[font.dim, { color: colour.pending, fontWeight: '600' }]}>{FLAG_LABEL[flag]}</Text>
             <GameCard
               now={now}
               onPress={() => router.push(`/game/${row.id}`)}
@@ -57,7 +57,7 @@ export default function ClubAdmin() {
         ))
       )}
 
-      <Text style={[font.heading, { paddingTop: space.block }]}>Members</Text>
+      <Text style={[font.heading, { paddingTop: space.block }]}>Thành viên</Text>
       <View style={layout.card}>
         {members.data.map((member, index) => (
           <View key={member.id} style={{ gap: space.row }}>
@@ -70,7 +70,7 @@ export default function ClubAdmin() {
               <View style={{ flex: 1 }}>
                 <Text style={font.body}>
                   {member.display_name}
-                  {member.is_admin ? '  · admin' : ''}
+                  {member.is_admin ? ' (admin)' : ''}
                 </Text>
                 <Text style={font.dim}>@{member.username}</Text>
               </View>

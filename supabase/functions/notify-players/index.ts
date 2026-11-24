@@ -39,11 +39,11 @@ Deno.serve(async (request) => {
     .select('profile_id')
     .eq('game_id', body.gameId);
   if (participants.error !== null) return json({ error: participants.error.message }, 500);
-  if (participants.data.length === 0) return json({ error: 'no such game' }, 404);
+  if (participants.data.length === 0) return json({ error: 'Không tìm thấy trận này' }, 404);
 
   const playing = participants.data.map((row) => row.profile_id);
   const asker = await authorise(service, request, playing);
-  if (asker === 'denied') return json({ error: 'not your game to announce' }, 403);
+  if (asker === 'denied') return json({ error: 'Bạn không ở trong trận này' }, 403);
 
   const game = await service
     .from('games')
@@ -90,12 +90,12 @@ const MESSAGES: Record<
 > = {
   'confirmation-request': {
     preference: 'confirmation_requests',
-    title: 'Confirm a game',
-    body: 'Someone logged a game you played in. Tap to confirm it.',
+    title: 'Xác nhận trận đấu',
+    body: 'Có người vừa ghi một trận bạn đã chơi. Chạm để xác nhận.',
   },
   dispute: {
     preference: 'dispute_alerts',
-    title: 'A game was disputed',
-    body: 'Someone disagrees with a game you played in. Sort it out at the next session.',
+    title: 'Một trận bị phản đối',
+    body: 'Có người không đồng ý với một trận bạn đã chơi. Cùng xem lại ở buổi chơi sau nhé.',
   },
 };

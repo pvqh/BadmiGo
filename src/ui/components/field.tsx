@@ -13,11 +13,12 @@ export function Field({
 } & TextInputProps) {
   return (
     <View style={style.field}>
-      <Text style={font.dim}>{label}</Text>
+      <Text style={style.label}>{label}</Text>
       <TextInput
         {...input}
+        accessibilityLabel={label}
         placeholderTextColor={colour.dim}
-        style={[style.input, problem != null ? style.wrong : null]}
+        style={[style.input, input.editable === false ? style.locked : null, problem != null ? style.wrong : null]}
       />
       {problem != null ? (
         <Text style={[font.dim, { color: colour.down }]}>{problem}</Text>
@@ -28,33 +29,48 @@ export function Field({
   );
 }
 
-/** One of a short, fixed set: a format, a tier, a ladder filter. */
+/**
+ * One of a short, fixed set: a format, a tier, a ladder filter. Drawn as one segmented
+ * track so the choices read as alternatives, with the chosen one lifted out in green.
+ */
 export function Choice<T extends string | number>({
   options,
   value,
   onChange,
+  onCourt = false,
 }: {
   readonly options: readonly { readonly value: T; readonly label: string }[];
   readonly value: T | null;
   readonly onChange: (value: T) => void;
+  /** Sitting on the green head of the ladder rather than on the floor. */
+  readonly onCourt?: boolean;
 }) {
   return (
-    <View style={style.choices}>
+    <View accessibilityRole="radiogroup" style={[style.track, onCourt ? style.courtTrack : null]}>
       {options.map((option) => {
         const chosen = option.value === value;
         return (
           <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: chosen }}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: chosen }}
             key={String(option.value)}
             onPress={() => onChange(option.value)}
             style={({ pressed }) => [
               style.choice,
-              chosen ? style.chosen : null,
-              pressed ? { opacity: 0.7 } : null,
+              chosen ? (onCourt ? style.chosenOnCourt : style.chosen) : null,
+              pressed && !chosen ? { opacity: 0.6 } : null,
             ]}
           >
-            <Text style={[font.body, chosen ? style.chosenLabel : null]}>{option.label}</Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                style.choiceLabel,
+                onCourt ? { color: colour.onCourtDim } : null,
+                chosen ? (onCourt ? { color: colour.court } : { color: colour.onCourt }) : null,
+              ]}
+            >
+              {option.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -64,30 +80,37 @@ export function Choice<T extends string | number>({
 
 const style = StyleSheet.create({
   field: { gap: space.tight },
+  label: { ...font.dim, fontWeight: '600', color: colour.text },
   input: {
-    minHeight: 48,
+    ...font.body,
+    minHeight: 52,
     paddingHorizontal: space.gap,
     borderRadius: radius.field,
-    backgroundColor: colour.raised,
-    borderWidth: 1,
+    backgroundColor: colour.card,
+    borderWidth: 1.5,
     borderColor: colour.line,
-    color: colour.text,
-    fontSize: 16,
   },
+  locked: { backgroundColor: colour.raised, color: colour.dim },
   wrong: { borderColor: colour.down },
-  choices: { flexDirection: 'row', gap: space.tight, flexWrap: 'wrap' },
+  track: {
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colour.card,
+  },
+  courtTrack: { backgroundColor: colour.courtDeep },
   choice: {
     minHeight: 40,
-    paddingHorizontal: space.gap,
+    paddingHorizontal: space.tight,
     justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: colour.raised,
-    borderWidth: 1,
-    borderColor: colour.line,
-    flexGrow: 1,
-    flexBasis: 0,
     alignItems: 'center',
+    borderRadius: radius.pill,
+    // Sized from the label, not split evenly, so "Newbie" is not cut off beside "Y".
+    flexGrow: 1,
+    flexBasis: 'auto',
   },
-  chosen: { backgroundColor: colour.accent, borderColor: colour.accent },
-  chosenLabel: { color: colour.onAccent, fontWeight: '600' },
+  chosen: { backgroundColor: colour.court },
+  chosenOnCourt: { backgroundColor: colour.onCourt },
+  choiceLabel: { ...font.body, fontSize: 15, fontWeight: '600', color: colour.text },
 });

@@ -7,7 +7,7 @@ import { Button } from './button';
 export function Pending() {
   return (
     <View style={layout.centre}>
-      <ActivityIndicator color={colour.accent} />
+      <ActivityIndicator color={colour.courtInk} />
     </View>
   );
 }
@@ -21,9 +21,9 @@ export function Problem({
 }) {
   return (
     <View style={layout.centre}>
-      <Text style={font.heading}>That did not load</Text>
+      <Text style={font.heading}>Không tải được</Text>
       <Text style={[font.dim, { textAlign: 'center' }]}>{message}</Text>
-      {onRetry !== undefined ? <Button label="Try again" tone="quiet" onPress={onRetry} /> : null}
+      {onRetry !== undefined ? <Button label="Thử lại" tone="quiet" onPress={onRetry} /> : null}
     </View>
   );
 }

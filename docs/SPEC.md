@@ -52,12 +52,15 @@ record polices itself without anyone being appointed referee.
 
 ### Signing up and getting in
 
-1. As a club player, I want to sign up with a username and password, so that I can join without sharing an email address.
+1. As a club player, I want to sign up with a username and password, so that I can join without sharing an email address. The username keeps the capitals I type (letters without accents, digits, `_ . -`, 3 to 20 characters), and signing in ignores case. (Revised 2026-11-25.)
 2. ~~As a club player, I want to sign up with my email and a password, so that I can use the method I am used to.~~ Removed 2026-11-24: username only, for simplicity.
 3. ~~As a club player, I want to sign in with Google, so that I can get in with one tap.~~ Removed 2026-11-24: username only, for simplicity.
 4. ~~As an iPhone user, I want to sign in with Apple, so that I can register without handing over personal details.~~ Removed 2026-11-24: Sign in with Apple on the web needs a paid Apple Developer account, and the App Store rule that made it mandatory alongside Google no longer applies.
 5. As a player who forgot my password, I want the admin to set me a temporary password courtside, so that I can get back in without an email address. (Revised 2026-11-24: there is no email to reset by.)
 6. As a player, I want to change my password from inside the app, so that I can manage my own account.
+6a. As a player, I want to change my display name from inside the app, so that the ladder shows whatever I want to be seen as. (Added 2026-11-25.)
+6b. As a player, I want to add a picture of myself when I create my profile, and change or remove it in Settings, so that the ladder and my profile show my face; without one, the first letter of my name stands in. (Added 2026-11-25.)
+6c. As someone who reached the create-profile step on the wrong account, I want a way back to sign in, so that I can use the account I already have. (Added 2026-11-25.)
 7. As a new member, I want to declare my current level at signup, so that my rating starts near reality instead of making me grind up from zero.
 8. As a new member, I want signup to take under thirty seconds, so that I can register courtside between games.
 9. As a player, I want a display name separate from my username, so that the ladder shows the name my friends actually call me.
@@ -75,7 +78,7 @@ record polices itself without anyone being appointed referee.
 18. As a logger playing several games with the same four people, I want to keep the lineup and just enter the next score, so that logging a whole afternoon takes seconds rather than minutes.
 19. As a logger, I want to see the rating change each player stands to gain or lose before I submit, so that I understand what is at stake.
 20. As a logger who made a mistake, I want to cancel a game I just submitted while it is still pending, so that I do not need to bother the admin.
-21. As a logger, I want to attach an optional photo as a memento, so that a good session leaves something behind — but never as a requirement.
+21. ~~As a logger, I want to attach an optional photo as a memento, so that a good session leaves something behind — but never as a requirement.~~ Removed 2026-11-25: a video was wanted instead, and video storage would cost money; neither photo nor video for now, until the author is ready to pay for storage.
 22a. As a logger, I want to easily clear a player I picked by mistake and search for someone else, so that a wrong pick costs one tap.
 
 ### Confirming and disputing
@@ -112,6 +115,7 @@ record polices itself without anyone being appointed referee.
 44. As a club player, I want to see games I was not in, so that the whole club's activity is visible and anyone can spot something wrong.
 45. As a club player, I want to open any game from the feed and see its full detail, so that I can check a result I am curious about. Once a game is confirmed, its detail does not list who confirmed it; that is only shown while it is pending (story 29).
 46. As a club player, I want the feed to be worth opening midweek, so that the app is not only useful during sessions.
+46a. As a club player, I want to be able to search for a specific game in the feed by player name or dates, so that I can find a game I am looking for without scrolling through dozens of others. (Added 2026-11-25.)
 
 ### My profile and stats
 
@@ -260,7 +264,7 @@ Authoritative:
 - **`profiles`** — username (unique), display name, gender (`male` | `female`),
   seed tier, admin flag, created at.
 - **`games`** — logger, format, both scores, winning side, played at, status
-  (`pending` | `confirmed` | `disputed` | `voided`), void reason, optional photo ref.
+  (`pending` | `confirmed` | `disputed` | `voided`), void reason.
 - **`game_participants`** — four rows per game: game, profile, side.
 - **`game_confirmations`** — game, profile, state (`pending` | `confirmed` |
   `disputed`), responded at.
@@ -284,8 +288,9 @@ provider.
 
 Supabase authenticates by email, so each account's auth email is derived from its
 username (`<name>@users.badminton-ladder.invalid`, a domain that can never receive
-mail). Username is stored on `profiles` with a uniqueness constraint and a
-reserved-names list.
+mail). Username is stored on `profiles` as typed, unique regardless of case, with a
+reserved-names list; the auth email is its lower-cased form, so sign-in ignores case
+(revised 2026-11-25).
 
 A forgotten password is reset by an admin: an admin-only Edge Function sets a
 temporary password on the member's account, the admin hands it over courtside, and
@@ -441,9 +446,11 @@ Not in v1, and not to be built opportunistically:
 - **Public or cross-club discovery.** One closed community, invite only.
 - **Chat, expense splitting, attendance tracking, court booking.** Other apps do
   these; this one does the ladder.
-- **Photo or video as proof.** A photo is an optional memento and never a
-  requirement, because a photo cannot establish a score and storage is the one thing
-  that could introduce a running cost.
+- **Photos and video of games.** (Member avatars, story 6b, are the one stored image:
+  a single small square per member.) Storage is the one thing that could introduce a
+  running cost, and a video of a game would use up the free tier within days. Removed
+  2026-11-25, to come back when the author is ready to pay for storage. Neither could
+  ever establish a score.
 - **Guest or placeholder player profiles.** Considered and rejected.
 - **Incremental rating updates.** Full replay only, until it measurably hurts.
 

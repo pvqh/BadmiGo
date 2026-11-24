@@ -1,6 +1,6 @@
 # Backend
 
-The database, its row-level security, sign-in, photo storage, and the six Edge
+The database, its row-level security, sign-in, and the six Edge
 Functions. Read `SPEC.md` first; this says how what it describes is wired.
 
 ## The shape of it
@@ -31,8 +31,8 @@ was done instead.
 
 ## What a browser may write
 
-Nothing, directly, except its own profile fields, its own push subscriptions, and a
-photo in its own storage folder. An admin may also set `is_admin` on anyone.
+Nothing, directly, except its own profile fields (the display name) and its own push
+subscriptions. An admin may also set `is_admin` on anyone.
 Everything else is a function or an RPC:
 
 | Route | Who | What it does |
@@ -70,7 +70,8 @@ The mapping is written twice, in `public.username_email_domain()` and in
 `src/data/auth.ts`. **Change them together or sign-in breaks.**
 
 No database trigger creates profiles. Signing up makes the account; the
-create-profile screen then calls `create_my_profile`, so an account whose profile step
+create-profile screen then calls `create_my_profile` (with an optional avatar path,
+already uploaded to the member's own folder in `avatars`), so an account whose profile step
 failed can finish later.
 
 **A forgotten password** is reset by an admin: the `admin` function's
@@ -118,16 +119,6 @@ The keys: `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in the
 functions' environment, and the public key again in the app's `.env` as
 `EXPO_PUBLIC_VAPID_PUBLIC_KEY`. Changing the pair later silently turns notifications
 off on every phone until each member switches them on again.
-
-## Photos
-
-A private `game-photos` bucket, JPEG only, 512 KB per file. Club members can read
-every photo; a member can upload only into a folder named after their own id, and a
-`games` insert trigger insists `photo_path` sits in the logger's folder (insert only,
-so a merge can move a game without moving its photo). The app shrinks a
-photo to a 1280 px long edge before uploading and shows it through a signed link that
-lasts an hour. Storage is the one thing here that could cost money; the free tier is
-1 GB.
 
 ## Running it locally
 

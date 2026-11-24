@@ -1,15 +1,15 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import type { ConfirmationState } from '../../src/domain/game-lifecycle';
 import { Pending, Problem } from '../../src/ui/components/async';
 import { AdminGamePanel } from '../../src/ui/components/admin-game-panel';
 import { Button, ButtonRow } from '../../src/ui/components/button';
 import { GameCard } from '../../src/ui/components/game-card';
 import { answerOf, lineupOf } from '../../src/ui/game-row';
-import { useAnswerGame, useGame, usePhotoUrl } from '../../src/ui/queries';
+import { useAnswerGame, useGame } from '../../src/ui/queries';
 import { useMember } from '../../src/ui/session';
-import { colour, font, layout, radius, space } from '../../src/ui/theme';
+import { colour, font, layout, space } from '../../src/ui/theme';
 
 /**
  * One game in full, and whatever is still open to the viewer. Who has answered is
@@ -22,7 +22,6 @@ export default function GameDetail() {
   const me = useMember();
 
   const game = useGame(id);
-  const photo = usePhotoUrl(game.data?.photo_path ?? null);
   const answering = useAnswerGame(me.id);
   const [armed, setArmed] = useState(false);
   const now = Date.now();
@@ -43,27 +42,19 @@ export default function GameDetail() {
     <ScrollView contentContainerStyle={layout.page} style={layout.screen}>
       <GameCard now={now} row={row} viewerId={me.id} />
 
-      {photo.data === undefined ? null : (
-        <Image
-          accessibilityLabel="Photo from the game"
-          source={{ uri: photo.data }}
-          style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: radius.card }}
-        />
-      )}
-
       {row.status !== 'pending' ? null : (
         <View style={layout.card}>
-          <Text style={font.heading}>Who has confirmed</Text>
+          <Text style={font.heading}>Ai đã xác nhận</Text>
           {everyone.map((player) => {
             const answer = answerOf(row, player.profileId);
             const state = answer === null ? 'pending' : answer.state;
             return (
               <View key={player.profileId} style={layout.spread}>
                 <Text style={font.body}>
-                  {player.displayName}
-                  {player.profileId === row.logger_id ? ' (logged it)' : ''}
+                  {player.profileId === me.id ? 'Bạn' : player.displayName}
+                  {player.profileId === row.logger_id ? ' (người ghi)' : ''}
                 </Text>
-                <Text style={[font.dim, { color: stateColour(state) }]}>{STATE_LABEL[state]}</Text>
+                <Text style={[font.dim, { color: stateColour(state), fontWeight: '700' }]}>{STATE_LABEL[state]}</Text>
               </View>
             );
           })}
@@ -72,37 +63,37 @@ export default function GameDetail() {
 
       {owed ? (
         <View style={{ gap: space.row }}>
-          <Text style={font.heading}>Is this score right?</Text>
+          <Text style={font.heading}>Tỉ số này đúng không?</Text>
           <ButtonRow>
             <Button
               busy={answering.isPending}
-              label="Yes, confirm"
+              label="Đúng, xác nhận"
               onPress={() => answering.mutate({ gameId: row.id, answer: 'confirm' })}
             />
             <Button
               busy={answering.isPending}
-              label="No, dispute"
+              label="Sai, phản đối"
               onPress={() => answering.mutate({ gameId: row.id, answer: 'dispute' })}
               tone="danger"
             />
           </ButtonRow>
           <Text style={font.dim}>
-            A dispute freezes the game and tells the other three, so you can sort it out
-            at the next session.
+            Phản đối sẽ đóng băng trận này và báo cho ba người còn lại, để mọi người cùng
+            xem lại ở buổi chơi sau.
           </Text>
         </View>
       ) : null}
 
       {row.status === 'disputed' ? (
         <Text style={font.dim}>
-          Frozen. It has not moved anyone's rating. Once you agree what happened, an
-          admin can fix the score or remove the game.
+          Đang đóng băng, chưa làm thay đổi điểm của ai. Khi mọi người thống nhất, admin
+          có thể sửa tỉ số hoặc gỡ trận này.
         </Text>
       ) : null}
 
       {row.status === 'voided' ? (
         <Text style={font.dim}>
-          {`Removed by an admin${row.void_reason === null ? '' : `: ${row.void_reason}`}. It does not count towards any rating.`}
+          {`Admin đã gỡ trận này${row.void_reason === null ? '' : `: ${row.void_reason}`}. Trận không được tính điểm.`}
         </Text>
       ) : null}
 
@@ -112,7 +103,7 @@ export default function GameDetail() {
             <ButtonRow>
               <Button
                 busy={answering.isPending}
-                label="Cancel game"
+                label="Huỷ trận"
                 onPress={() =>
                   answering.mutate(
                     { gameId: row.id, answer: 'cancel' },
@@ -121,13 +112,13 @@ export default function GameDetail() {
                 }
                 tone="danger"
               />
-              <Button label="Keep it" onPress={() => setArmed(false)} tone="quiet" />
+              <Button label="Giữ lại" onPress={() => setArmed(false)} tone="quiet" />
             </ButtonRow>
           ) : (
-            <Button label="Cancel this game" onPress={() => setArmed(true)} tone="quiet" />
+            <Button label="Huỷ trận này" onPress={() => setArmed(true)} tone="quiet" />
           )}
           {armed ? (
-            <Text style={font.dim}>It disappears for all four players.</Text>
+            <Text style={font.dim}>Trận sẽ biến mất với cả bốn người.</Text>
           ) : null}
         </View>
       ) : null}
@@ -142,9 +133,9 @@ export default function GameDetail() {
 }
 
 const STATE_LABEL: Record<ConfirmationState, string> = {
-  pending: 'waiting',
-  confirmed: 'confirmed',
-  disputed: 'disputed',
+  pending: 'đang chờ',
+  confirmed: 'đã xác nhận',
+  disputed: 'phản đối',
 };
 
 function stateColour(state: ConfirmationState): string {

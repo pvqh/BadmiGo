@@ -1,8 +1,12 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { nextTier } from '../domain/rating-scale';
 import type { ProfileId } from '../domain/types';
 import { Nothing, Pending, Problem } from './components/async';
+import { Avatar } from './components/avatar';
 import { PlacementBadge, TierBadge } from './components/badge';
 import { GameCard } from './components/game-card';
 import { RatingGraph } from './components/rating-graph';
@@ -14,7 +18,8 @@ import {
   useStrengths,
 } from './queries';
 import { useMember } from './session';
-import { colour, font, layout, space } from './theme';
+import { colour, font, layout, radius, space } from './theme';
+import { TIER_LABEL } from './vocabulary';
 import type { PartnerTally, Tally } from '../domain/stats';
 
 const RECENT_GAMES = 8;
@@ -29,17 +34,22 @@ const PARTNERS_SHOWN = 3;
 export function PlayerProfile({
   profileId,
   fallbackName,
+  underStatusBar = false,
 }: {
   readonly profileId: ProfileId;
   readonly fallbackName: string;
+  /** On a tab there is no navigation bar above, so the page clears the status bar itself. */
+  readonly underStatusBar?: boolean;
 }) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const me = useMember();
 
   const rating = usePlayerRating(profileId);
   const history = useRatingHistory(profileId);
   const played = usePlayerGames(profileId);
   const strengths = useStrengths();
+  const [explainPve, setExplainPve] = useState(false);
 
   const now = Date.now();
   // The month boundary, not the clock: this holds between renders, so the memo does.
@@ -61,6 +71,11 @@ export function PlayerProfile({
   }
 
   const name = rating.data?.profiles.display_name ?? fallbackName;
+  const avatarPath = rating.data?.profiles.avatar_path ?? null;
+  const next =
+    rating.data === null || rating.data === undefined || rating.data.in_placement
+      ? null
+      : nextTier(rating.data.display_rating);
   const games = [...(played.data ?? [])].sort(
     (left, right) =>
       new Date(right.games.played_at).getTime() - new Date(left.games.played_at).getTime(),
@@ -73,57 +88,102 @@ export function PlayerProfile({
   const perGame = stats.expectation?.perGame ?? null;
 
   return (
-    <ScrollView contentContainerStyle={layout.page} style={layout.screen}>
+    <ScrollView
+      contentContainerStyle={[layout.page, underStatusBar ? { paddingTop: insets.top + 20 } : null]}
+      style={layout.screen}
+    >
       <View style={{ gap: space.tight }}>
-        <Text style={font.title}>{name}</Text>
+        <View style={[layout.row, { gap: space.gap }]}>
+          <Avatar name={name} path={avatarPath} size={64} />
+          <Text accessibilityRole="header" numberOfLines={2} style={[font.heading, { fontSize: 24, flex: 1 }]}>
+            {name}
+          </Text>
+        </View>
         {rating.data === null || rating.data === undefined ? (
-          <Text style={font.dim}>No rating yet. It appears after their first confirmed game.</Text>
+          <Text style={font.dim}>Chưa có điểm. Điểm hiện sau trận đầu tiên được xác nhận.</Text>
         ) : rating.data.in_placement ? (
-          <View style={{ alignItems: 'flex-start' }}>
+          <View style={{ gap: 4, paddingTop: space.tight }}>
+            <Text style={font.heading}>Đang xếp hạng</Text>
             <PlacementBadge gamesPlayed={rating.data.games_played} />
           </View>
         ) : (
-          <View style={layout.row}>
-            <Text style={[font.score, { fontSize: 64, color: colour.accent }]}>
+          <View style={[layout.row, { alignItems: 'baseline' }]}>
+            <Text style={[font.score, { fontSize: 76, lineHeight: 80 }]}>
               {rating.data.display_rating}
             </Text>
-            <TierBadge tier={rating.data.tier} />
+            <TierBadge large tier={rating.data.tier} />
           </View>
         )}
         {rating.data === null || rating.data === undefined ? null : (
           <Text style={font.dim}>
-            {`${stats.thisMonth} ${stats.thisMonth === 1 ? 'game' : 'games'} this month, ${rating.data.games_played} in total`}
+            {`${stats.thisMonth} trận tháng này, tổng cộng ${rating.data.games_played} trận`}
           </Text>
         )}
       </View>
 
-      <View style={[layout.card, layout.spread]}>
-        <Figure label="Won–lost" value={`${stats.record.won}–${stats.record.lost}`} />
-        <Figure label="Win rate" value={percent(stats.record)} />
-        <Figure
-          colour={expectationColour(perGame)}
-          label="PvE"
-          value={perGame === null ? '—' : `${perGame > 0 ? '+' : ''}${(perGame * 100).toFixed(0)}%`}
-        />
+      {next === null || rating.data === null || rating.data === undefined ? null : (
+        <View style={layout.card}>
+          <View style={layout.spread}>
+            <Text style={[font.body, { fontWeight: '700' }]}>
+              {`Còn ${next.floor - rating.data.display_rating} điểm lên ${TIER_LABEL[next.tier]}`}
+            </Text>
+            <Text style={font.dim}>{next.floor}</Text>
+          </View>
+          <View style={style.track}>
+            <View
+              style={[
+                style.progress,
+                { width: `${Math.round(((rating.data.display_rating - next.from) / (next.floor - next.from)) * 100)}%` },
+              ]}
+            />
+          </View>
+        </View>
+      )}
+
+      <View style={style.figures}>
+        <Figure label="Thắng–thua" value={`${stats.record.won}–${stats.record.lost}`} />
+        <Figure label="Tỉ lệ thắng" value={percent(stats.record)} />
+        {/* The figure is opaque on its own, so the explanation is one tap away rather than always on. */}
+        <Pressable
+          accessibilityHint="Hiện giải thích PvE"
+          accessibilityRole="button"
+          accessibilityState={{ expanded: explainPve }}
+          onPress={() => setExplainPve((open) => !open)}
+          style={({ pressed }) => [style.figure, pressed ? { opacity: 0.7 } : null]}
+        >
+          <Text style={[font.score, style.figureValue, { color: expectationColour(perGame) }]}>
+            {perGame === null ? '—' : `${perGame > 0 ? '+' : ''}${(perGame * 100).toFixed(0)}%`}
+          </Text>
+          <View style={[layout.row, { gap: 4 }]}>
+            <Text style={font.dim}>PvE</Text>
+            <Ionicons
+              color={colour.dim}
+              name={explainPve ? 'information-circle' : 'information-circle-outline'}
+              size={16}
+            />
+          </View>
+        </Pressable>
       </View>
-      <Text style={font.dim}>
+      {explainPve ? (
+        <Text style={font.dim}>
         "Performance vs Expectation (PvE)" là chỉ số hiệu suất so với kỳ vọng, cho thấy bạn thắng nhiều hay ít hơn so với dự đoán. Một đối thủ mạnh có thể nâng cao chỉ số này, nhưng một đồng đội mạnh không thể làm được điều đó. 
-      </Text>
+        </Text>
+      ) : null}
 
       <View style={layout.card}>
-        <Text style={font.heading}>Rating over time</Text>
+        <Text style={font.heading}>Điểm qua các trận</Text>
         <RatingGraph points={points} />
       </View>
 
       {stats.partners.length === 0 ? null : (
         <View style={layout.card}>
-          <Text style={font.heading}>Best partners</Text>
+          <Text style={font.heading}>Đánh cặp hợp nhất</Text>
           {best(stats.partners).map((partner) => (
             <PartnerRow key={partner.partnerId} name={stats.names.get(partner.partnerId)} partner={partner} />
           ))}
           {worst(stats.partners).length === 0 ? null : (
             <>
-              <Text style={[font.heading, { paddingTop: space.row }]}>Worst with</Text>
+              <Text style={[font.heading, { paddingTop: space.row }]}>Đánh cặp kém nhất</Text>
               {worst(stats.partners).map((partner) => (
                 <PartnerRow key={partner.partnerId} name={stats.names.get(partner.partnerId)} partner={partner} />
               ))}
@@ -137,7 +197,7 @@ export function PlayerProfile({
           <Text style={font.heading}>Hiệu số đối đầu</Text>
           {stats.rivals.slice(0, RIVALS_SHOWN).map((rival) => (
             <View key={rival.opponentId} style={layout.spread}>
-              <Text style={font.body}>{stats.names.get(rival.opponentId) ?? 'someone'}</Text>
+              <Text style={font.body}>{stats.names.get(rival.opponentId) ?? 'Ai đó'}</Text>
               <Text style={font.figure}>{`${rival.won}–${rival.lost}`}</Text>
             </View>
           ))}
@@ -146,7 +206,7 @@ export function PlayerProfile({
 
       <Text style={font.heading}>Các trận gần đây</Text>
       {games.length === 0 ? (
-        <Nothing message="No games yet." />
+        <Nothing message="Chưa có trận nào." />
       ) : (
         <View style={{ gap: space.row }}>
           {games.slice(0, RECENT_GAMES).map(({ games: row }) => (
@@ -164,18 +224,10 @@ export function PlayerProfile({
   );
 }
 
-function Figure({
-  label,
-  value,
-  colour: tone = colour.text,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly colour?: string;
-}) {
+function Figure({ label, value }: { readonly label: string; readonly value: string }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-      <Text style={[font.score, { fontSize: 30, color: tone }]}>{value}</Text>
+    <View style={style.figure}>
+      <Text style={[font.score, style.figureValue]}>{value}</Text>
       <Text style={font.dim}>{label}</Text>
     </View>
   );
@@ -190,9 +242,9 @@ function PartnerRow({
 }) {
   return (
     <View style={layout.spread}>
-      <Text style={font.body}>{name ?? 'someone'}</Text>
+      <Text style={font.body}>{name ?? 'Ai đó'}</Text>
       <Text style={font.dim}>
-        {`won ${partner.won} of ${partner.played} (${percent(partner)})`}
+        {`thắng ${partner.won}/${partner.played} (${percent(partner)})`}
       </Text>
     </View>
   );
@@ -220,3 +272,18 @@ function expectationColour(perGame: number | null): string {
   if (perGame > 0.05) return colour.up;
   return perGame < -0.05 ? colour.down : colour.text;
 }
+
+const style = StyleSheet.create({
+  figures: { flexDirection: 'row', gap: space.tight + 2 },
+  figure: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: space.row + 2,
+    borderRadius: radius.card - 2,
+    backgroundColor: colour.card,
+  },
+  figureValue: { fontSize: 30, lineHeight: 34 },
+  track: { height: 10, borderRadius: radius.pill, backgroundColor: colour.raised, overflow: 'hidden' },
+  progress: { height: '100%', borderRadius: radius.pill, backgroundColor: colour.court },
+});

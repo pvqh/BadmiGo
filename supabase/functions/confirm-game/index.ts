@@ -28,7 +28,7 @@ Deno.serve(async (request) => {
   const service = serviceClient();
 
   const profileId = await callerProfileId(service, request);
-  if (profileId === null) return json({ error: 'sign in first' }, 401);
+  if (profileId === null) return json({ error: 'Hãy đăng nhập trước' }, 401);
 
   const body = parse(await request.json().catch(() => null));
   if (body === null) {
@@ -39,8 +39,8 @@ Deno.serve(async (request) => {
   const outcome = await applyGameEvent(service, body.gameId, event);
 
   if (!outcome.ok) {
-    if (outcome.reason === 'game-not-found') return json({ error: 'no such game' }, 404);
-    if (outcome.reason === 'contended') return json({ error: 'try again' }, 503);
+    if (outcome.reason === 'game-not-found') return json({ error: 'Không tìm thấy trận này' }, 404);
+    if (outcome.reason === 'contended') return json({ error: 'Có người vừa trả lời cùng lúc. Thử lại nhé.' }, 503);
     return json({ rejection: outcome.reason }, 409);
   }
 

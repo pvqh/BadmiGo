@@ -49,7 +49,7 @@ export const supabase = createClient<Database>(
  */
 export function unwrap<T>(result: PostgrestSingleResponse<T>): T {
   if (result.error !== null) throw new Error(result.error.message);
-  if (result.data === null) throw new Error('the request succeeded but returned nothing');
+  if (result.data === null) throw new Error('Máy chủ không trả về dữ liệu');
   return result.data;
 }
 

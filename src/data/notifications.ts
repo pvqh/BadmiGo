@@ -50,9 +50,9 @@ export async function pushState(): Promise<PushState> {
  */
 export async function turnOnPush(profileId: string): Promise<void> {
   const key = pushKey();
-  if (key === null) throw new Error('this browser cannot receive notifications');
+  if (key === null) throw new Error('Trình duyệt này không nhận được thông báo');
   if ((await Notification.requestPermission()) !== 'granted') {
-    throw new Error('notifications were not allowed');
+    throw new Error('Thông báo chưa được cho phép');
   }
 
   const subscription = await (await registration()).pushManager.subscribe({
@@ -61,7 +61,7 @@ export async function turnOnPush(profileId: string): Promise<void> {
   });
   const { endpoint, keys } = subscription.toJSON();
   if (endpoint === undefined || keys === undefined) {
-    throw new Error('the browser returned an incomplete subscription');
+    throw new Error('Trình duyệt chưa đăng ký thông báo đầy đủ');
   }
 
   // Keyed by the endpoint, so a phone that changes hands moves with its new owner

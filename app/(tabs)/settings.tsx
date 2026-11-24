@@ -6,17 +6,23 @@ import { changePassword, signOut } from '../../src/data/auth';
 import { MIN_PASSWORD } from '../../src/data/function-contract';
 import { turnOffPush, type Preferences, type PushState } from '../../src/data/notifications';
 import { Pending, Problem } from '../../src/ui/components/async';
+import { AvatarPicker } from '../../src/ui/components/avatar-picker';
 import { Button } from '../../src/ui/components/button';
-import { Field } from '../../src/ui/components/field';
+import { Choice, Field } from '../../src/ui/components/field';
+import { ScreenTitle } from '../../src/ui/components/screen-title';
 import {
+  useChangeAvatar,
+  useChangeDisplayName,
   usePreferences,
   usePushState,
   useSetPush,
   useUpdatePreferences,
 } from '../../src/ui/queries';
 import { useMember } from '../../src/ui/session';
-import { colour, font, layout, space } from '../../src/ui/theme';
+import { chooseScheme, colour, font, layout, scheme, space } from '../../src/ui/theme';
 
+/** The profiles table's own limit, so the box stops where the database would refuse. */
+const DISPLAY_NAME_MAX = 40;
 
 type Switchable = keyof Pick<
   Preferences,
@@ -46,6 +52,10 @@ export default function Settings() {
   const push = usePushState();
   const setPush = useSetPush(me.id);
 
+  const [displayName, setDisplayName] = useState(me.display_name);
+  const renaming = useChangeDisplayName(me.id);
+  const picturing = useChangeAvatar(me.id, me.avatar_path);
+
   const [password, setPassword] = useState('');
   const changing = useMutation({
     mutationFn: () => changePassword(password),
@@ -73,6 +83,57 @@ export default function Settings() {
 
   return (
     <ScrollView contentContainerStyle={layout.page} style={layout.screen}>
+      <ScreenTitle title="Cài đặt" />
+
+      <View style={layout.card}>
+        <Text style={font.heading}>Ảnh đại diện</Text>
+        <AvatarPicker
+          busy={picturing.isPending}
+          name={me.display_name}
+          onChoose={(picture) => picturing.mutate(picture)}
+          onRemove={() => picturing.mutate(null)}
+          path={me.avatar_path}
+        />
+        {picturing.isError ? (
+          <Text style={[font.dim, { color: colour.down }]}>{picturing.error.message}</Text>
+        ) : null}
+      </View>
+
+      <View style={layout.card}>
+        <Text style={font.heading}>Giao diện</Text>
+        <Choice
+          onChange={chooseScheme}
+          options={[
+            { value: 'light', label: 'Sáng' },
+            { value: 'dark', label: 'Tối' },
+          ]}
+          value={scheme}
+        />
+        <Text style={font.dim}>Chỉ áp dụng trên máy này. Ứng dụng tải lại khi đổi.</Text>
+      </View>
+
+      <View style={layout.card}>
+        <Text style={font.heading}>Tên hiển thị</Text>
+        <Field
+          hint="Tên hiện trên bảng xếp hạng và bảng tin."
+          label="Tên mới"
+          maxLength={DISPLAY_NAME_MAX}
+          onChangeText={setDisplayName}
+          value={displayName}
+        />
+        {renaming.isError ? (
+          <Text style={[font.dim, { color: colour.down }]}>{renaming.error.message}</Text>
+        ) : null}
+        {renaming.isSuccess && displayName.trim() === me.display_name ? (
+          <Text style={[font.dim, { color: colour.up }]}>Đã đổi.</Text>
+        ) : null}
+        <Button
+          busy={renaming.isPending}
+          disabled={displayName.trim().length === 0 || displayName.trim() === me.display_name}
+          label="Lưu"
+          onPress={() => renaming.mutate(displayName)}
+        />
+      </View>
 
       <View style={layout.card}>
         <Text style={font.heading}>Thông báo</Text>
@@ -82,8 +143,8 @@ export default function Settings() {
             <Switch
               disabled={setPush.isPending}
               onValueChange={(on) => setPush.mutate(on)}
-              thumbColor={colour.text}
-              trackColor={{ true: colour.accent, false: colour.line }}
+              thumbColor={colour.onCourt}
+              trackColor={{ true: colour.court, false: colour.switchOff }}
               value={push.data === 'on'}
             />
           </View>
@@ -94,19 +155,17 @@ export default function Settings() {
           <Text style={[font.dim, { color: colour.down }]}>{setPush.error.message}</Text>
         ) : null}
         {NOTIFICATIONS.map(({ key, label }) => (
-          <View key={key} style={layout.spread}>
+          <View key={key} style={[layout.spread, { minHeight: 44 }]}>
             <Text style={[font.body, { flex: 1 }]}>{label}</Text>
             <Switch
-            
+              accessibilityLabel={label}
               onValueChange={(value) => update.mutate({ [key]: value })}
-              style={ { marginBottom: space.row, transform: [{ scale: 1.4 }] }}
-              thumbColor={colour.text}
-              trackColor={{ true: colour.accent, false: colour.line }}
+              thumbColor={colour.onCourt}
+              trackColor={{ true: colour.court, false: colour.switchOff }}
               value={current[key]}
             />
           </View>
         ))}
-       
       </View>
 
       <View style={layout.card}>
@@ -137,7 +196,7 @@ export default function Settings() {
       {me.is_admin ? (
         <View style={layout.card}>
           <Text style={font.heading}>Quản trị</Text>
-          <Link href="/admin" style={[font.body, { color: colour.accent }]}>
+          <Link href="/admin" style={[font.body, { color: colour.courtInk, fontWeight: '600' }]}>
             Mở trang quản trị CLB
           </Link>
         </View>

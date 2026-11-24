@@ -18,29 +18,33 @@ export default function SignIn() {
   return (
     <KeyboardAvoidingView behavior="padding" style={layout.screen}>
       <ScrollView contentContainerStyle={[layout.page, { paddingTop: space.block * 3 }]}>
-        <Text style={font.title}>Badminton Ladder</Text>
-        <Text style={font.dim}>Log your games. The ladder sorts itself out.</Text>
+        <View style={{ gap: space.tight }}>
+          <Text accessibilityRole="header" style={[font.title, { fontSize: 36 }]}>
+            Đội Vịt Leaderboard
+          </Text>
+          <Text style={font.dim}>Nào mình cùng leo rank !!!</Text>
+        </View>
 
         <InstallHint />
 
-        <View style={{ height: space.block }} />
+        <View style={{ height: space.row }} />
 
         <Field
-          //autoCapitalize="none"
-          autoCorrect={false}
+          autoCapitalize="none"
           autoComplete="username"
-          label="Username"
+          autoCorrect={false}
+          label="Tên đăng nhập"
           onChangeText={setHandle}
           placeholder="TrangXinhGai01"
           value={handle}
         />
         <Field
-          //autoCapitalize="none"
+          autoCapitalize="none"
           autoComplete="current-password"
-          label="Password"
+          label="Mật khẩu"
           onChangeText={setPassword}
+          placeholder="••••••••"
           secureTextEntry
-          placeholder="•••••••••"
           value={password}
         />
 
@@ -51,24 +55,18 @@ export default function SignIn() {
         <Button
           busy={signingIn.isPending}
           disabled={!ready}
-          label="Sign in"
+          label="Đăng nhập"
           onPress={() => signingIn.mutate()}
         />
-        <Text style={[font.dim, {textAlign: 'center'}]}>
-            Chưa có tài khoản? <Link href="/sign-up" style={{color: colour.accent}}>Tham gia ngay</Link>
-          </Text>
-        {/* <View style={{ paddingTop: space.row, gap: space.tight }}>
-          <Link href="/sign-up" style={[font.body, {fontSize: 17}]}>
-            Join the club
+        <Text style={[font.body, { textAlign: 'center' }]}>
+          {'Chưa có tài khoản? '}
+          <Link href="/sign-up" style={{ color: colour.courtInk, fontWeight: '700' }}>
+            Tham gia ngay
           </Link>
-          <Text style={font.dim}>
-            Quên mật khẩu? Hãy báo cáo với admin để được cấp lại mật khẩu. Bạn có thể tìm thấy thông tin liên hệ trong phần
-  "About" của ứng dụng.
-          </Text>
-        </View> */}
-        <Text style={[font.dim, {textAlign: 'center', paddingTop: space.row}]}>
-            Quên mật khẩu? {'\n'}Hãy báo cáo với admin để được cấp lại mật khẩu.
-          </Text>
+        </Text>
+        <Text style={[font.dim, { textAlign: 'center', paddingTop: space.row }]}>
+          {'Quên mật khẩu?\nHãy báo admin để được cấp mật khẩu tạm.'}
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

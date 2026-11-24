@@ -9,7 +9,8 @@ import {
   readGamesFor,
   readGamesForReview,
   readMyPendingGames,
-  photoUrl,
+  searchFeed,
+  type FeedSearch,
   type Answer,
 } from '../data/games';
 import {
@@ -20,7 +21,8 @@ import {
   readStrengths,
   searchPlayers,
 } from '../data/ladder';
-import { usernameAvailable, usernameProblem } from '../data/auth';
+import { changeDisplayName, usernameAvailable, usernameProblem } from '../data/auth';
+import { changeAvatar, uploadAvatar } from '../data/avatar';
 import {
   pushState,
   readPreferences,
@@ -41,6 +43,7 @@ export const keys = {
   ladder: ['ladder'] as const,
   strengths: ['strengths'] as const,
   feed: ['feed'] as const,
+  feedSearch: (search: FeedSearch) => ['feed', 'search', search.term, search.day] as const,
   replay: ['replay'] as const,
   pending: (profileId: ProfileId) => ['pending', profileId] as const,
   game: (gameId: string) => ['game', gameId] as const,
@@ -52,7 +55,6 @@ export const keys = {
   preferences: (profileId: ProfileId) => ['preferences', profileId] as const,
   push: ['push'] as const,
   members: ['members'] as const,
-  photo: (path: string) => ['photo', path] as const,
   review: ['review'] as const,
 };
 
@@ -62,13 +64,13 @@ export const keys = {
  * rule lives in SQL and only it knows which rule was broken.
  */
 export function useUsernameCheck(username: string) {
-  const handle = username.trim().toLowerCase();
+  const handle = username.trim();
   return useQuery({
     queryKey: keys.username(handle),
     queryFn: async () => {
       const problem = await usernameProblem(handle);
       if (problem !== null) return problem;
-      return (await usernameAvailable(handle)) ? null : `${handle} is already taken`;
+      return (await usernameAvailable(handle)) ? null : `${handle} đã có người dùng`;
     },
     enabled: handle.length > 0,
   });
@@ -84,6 +86,16 @@ export function useStrengths() {
 
 export function useFeed() {
   return useQuery({ queryKey: keys.feed, queryFn: () => readFeed() });
+}
+
+/** Story 46a. Off until a name or a day is given; the plain feed covers the empty case. */
+export function useFeedSearch(term: string, day: string | null) {
+  const search = { term: term.trim(), day };
+  return useQuery({
+    queryKey: keys.feedSearch(search),
+    queryFn: () => searchFeed(search),
+    enabled: search.term.length > 0 || day !== null,
+  });
 }
 
 export function useReplayState() {
@@ -145,16 +157,6 @@ export function useSetPush(profileId: ProfileId) {
   return useMutation({
     mutationFn: (on: boolean) => (on ? turnOnPush(profileId) : turnOffPush()),
     onSettled: () => queryClient.invalidateQueries({ queryKey: keys.push }),
-  });
-}
-
-/** Refreshed well inside the hour the signed link lasts. */
-export function usePhotoUrl(path: string | null) {
-  return useQuery({
-    queryKey: keys.photo(path ?? ''),
-    queryFn: () => photoUrl(path ?? ''),
-    enabled: path !== null,
-    staleTime: 30 * 60 * 1000,
   });
 }
 
@@ -235,6 +237,32 @@ export function useConfirmAll() {
       for (const gameId of gameIds) await answerGame(gameId, 'confirm');
     },
     onSettled: () => queryClient.invalidateQueries(),
+  });
+}
+
+/** A name shows on the ladder, the feed and every game, so nothing cached survives it. */
+export function useChangeDisplayName(profileId: ProfileId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (displayName: string) => changeDisplayName(profileId, displayName),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+/**
+ * Story 6b, from Settings. Null takes the picture away. A picture shows on the ladder
+ * and every profile, so, like a name, it leaves nothing cached behind.
+ */
+export function useChangeAvatar(profileId: ProfileId, previous: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (picture: Blob | null) =>
+      changeAvatar({
+        profileId,
+        previous,
+        next: picture === null ? null : await uploadAvatar(picture),
+      }),
+    onSuccess: () => queryClient.invalidateQueries(),
   });
 }
 

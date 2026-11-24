@@ -57,9 +57,9 @@ Deno.serve(async (request) => {
       {
         profileId,
         message: {
-          title: 'Your week on the ladder',
+          title: 'Tuần qua của bạn',
           body:
-            `${recap.games} games, ${recap.wins} won. Rating ${recap.ratingBefore} → ` +
+            `${recap.games} trận, thắng ${recap.wins}. Điểm ${recap.ratingBefore} → ` +
             `${recap.ratingAfter} (${moved >= 0 ? '+' : ''}${moved}).`,
           path: 'me',
         },

@@ -4,6 +4,7 @@ import {
   SIGMA_INITIAL,
   displayRating,
   inflateSigmaForIdleTime,
+  nextTier,
   seedMu,
   tierFor,
 } from './rating-scale';
@@ -115,5 +116,29 @@ describe('inflateSigmaForIdleTime', () => {
 
   it('never deflates a player who is already more uncertain than a newcomer', () => {
     expect(inflateSigmaForIdleTime(SIGMA_INITIAL, 30 * DAY_MS)).toBe(SIGMA_INITIAL);
+  });
+});
+
+describe('the next tier up', () => {
+  it('names the tier above and how far off its floor is', () => {
+    expect(nextTier(593)).toEqual({ tier: 'tby', floor: 600, from: 400 });
+    expect(nextTier(0)).toEqual({ tier: 'y', floor: 400, from: 0 });
+  });
+
+  it('starts counting at a tier floor exactly', () => {
+    expect(nextTier(600)).toEqual({ tier: 'tb-plus', floor: 880, from: 600 });
+  });
+
+  it('agrees with tierFor about where each band begins', () => {
+    for (const rating of [0, 399, 400, 599, 600, 879, 880, 1119]) {
+      const next = nextTier(rating);
+      expect(next === null ? null : tierFor(next.floor)).toBe(next?.tier ?? null);
+      expect(next === null ? null : tierFor(next.floor - 1)).toBe(tierFor(rating));
+    }
+  });
+
+  it('has nothing above Khá', () => {
+    expect(nextTier(1120)).toBeNull();
+    expect(nextTier(1500)).toBeNull();
   });
 });

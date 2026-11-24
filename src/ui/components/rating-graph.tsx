@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import Svg, { Line, Polyline } from 'react-native-svg';
+import Svg, { Line, Polygon, Polyline } from 'react-native-svg';
 import { colour, font, layout } from '../theme';
 
 const HEIGHT = 120;
@@ -12,7 +12,7 @@ const PADDING = 6;
  */
 export function RatingGraph({ points }: { readonly points: readonly number[] }) {
   if (points.length < 2) {
-    return <Text style={font.dim}>Two confirmed games and a line appears here.</Text>;
+    return <Text style={font.dim}>Sau hai trận được xác nhận, đường điểm sẽ hiện ở đây.</Text>;
   }
 
   const low = Math.min(...points);
@@ -44,18 +44,20 @@ export function RatingGraph({ points }: { readonly points: readonly number[] }) 
           y1={HEIGHT - PADDING}
           y2={HEIGHT - PADDING}
         />
+        <Polygon fill={colour.courtSoft} points={`0,${HEIGHT} ${plotted} 100,${HEIGHT}`} />
         <Polyline
           fill="none"
           points={plotted}
-          stroke={colour.accent}
-          strokeWidth={2}
+          stroke={colour.courtInk}
+          strokeLinejoin="round"
+          strokeWidth={2.5}
           vectorEffect="non-scaling-stroke"
         />
       </Svg>
       <View style={layout.spread}>
-        <Text style={font.dim}>{`low ${low}`}</Text>
-        <Text style={font.dim}>{`${points.length} games`}</Text>
-        <Text style={font.dim}>{`high ${high}`}</Text>
+        <Text style={[font.dim, { fontSize: 12 }]}>{`thấp nhất ${low}`}</Text>
+        <Text style={[font.dim, { fontSize: 12 }]}>{`${points.length - 1} trận`}</Text>
+        <Text style={[font.dim, { fontSize: 12 }]}>{`cao nhất ${high}`}</Text>
       </View>
     </View>
   );

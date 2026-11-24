@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Pending, Problem } from '../src/ui/components/async';
 import { SessionProvider, useSession } from '../src/ui/session';
-import { colour } from '../src/ui/theme';
+import { colour, font, scheme } from '../src/ui/theme';
 
 /**
  * Thirty players and two sessions a week: a half-minute of staleness is invisible,
@@ -19,7 +19,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <SessionProvider>
-          <StatusBar style="light" />
+          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
           <Routes />
         </SessionProvider>
       </SafeAreaProvider>
@@ -37,7 +37,7 @@ function Routes() {
 
   if (status === 'loading') return <Pending />;
   if (status === 'unavailable') {
-    return <Problem message={problem ?? 'the club could not be reached'} onRetry={retry} />;
+    return <Problem message={problem ?? 'Không kết nối được tới câu lạc bộ'} onRetry={retry} />;
   }
 
   const home =
@@ -47,7 +47,8 @@ function Routes() {
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colour.background },
-        headerTintColor: colour.text,
+        headerTintColor: colour.courtInk,
+        headerTitleStyle: { ...font.heading },
         headerShadowVisible: false,
         // Arrow only: the screen behind is the tab group, whose route name is "(tabs)".
         headerBackButtonDisplayMode: 'minimal',
@@ -56,21 +57,21 @@ function Routes() {
     >
       <Stack.Protected guard={status === 'member'} redirectTo={home}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="game/[id]" options={{ title: 'Game' }} />
+        <Stack.Screen name="game/[id]" options={{ title: 'Trận đấu' }} />
         <Stack.Screen name="player/[id]" options={{ title: '' }} />
         <Stack.Protected guard={profile?.is_admin === true}>
-          <Stack.Screen name="admin/index" options={{ title: 'Club admin' }} />
-          <Stack.Screen name="admin/[id]" options={{ title: 'Member' }} />
+          <Stack.Screen name="admin/index" options={{ title: 'Quản trị CLB' }} />
+          <Stack.Screen name="admin/[id]" options={{ title: 'Thành viên' }} />
         </Stack.Protected>
       </Stack.Protected>
 
       <Stack.Protected guard={status === 'needs-profile'} redirectTo={home}>
-        <Stack.Screen name="create-profile" options={{ title: 'Finish signing up' }} />
+        <Stack.Screen name="create-profile" options={{ title: 'Hoàn tất đăng ký' }} />
       </Stack.Protected>
 
       <Stack.Protected guard={status === 'signed-out'} redirectTo={home}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-        <Stack.Screen name="sign-up" options={{ title: 'Join the club' }} />
+        <Stack.Screen name="sign-up" options={{ title: 'Tạo tài khoản' }} />
       </Stack.Protected>
     </Stack>
   );

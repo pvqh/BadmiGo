@@ -34,44 +34,44 @@ export function AdminGamePanel({ row }: { readonly row: GameRow }) {
         <View style={{ gap: space.tight }}>
           <Button
             busy={act.isPending}
-            label="Resolve: the score as logged stands"
+            label="Giữ nguyên tỉ số như đã ghi"
             onPress={() => act.mutate({ action: 'resolve', gameId: row.id })}
           />
-          <Text style={font.dim}>Or correct the score first, then resolve it.</Text>
+          <Text style={font.dim}>Hoặc sửa tỉ số trước rồi giữ nguyên.</Text>
         </View>
       ) : null}
 
       <View style={layout.row}>
         <View style={{ flex: 1 }}>
-          <Field keyboardType="number-pad" label="Side A" onChangeText={setScoreA} value={scoreA} />
+          <Field keyboardType="number-pad" label="Đội A" onChangeText={setScoreA} value={scoreA} />
         </View>
         <View style={{ flex: 1 }}>
-          <Field keyboardType="number-pad" label="Side B" onChangeText={setScoreB} value={scoreB} />
+          <Field keyboardType="number-pad" label="Đội B" onChangeText={setScoreB} value={scoreB} />
         </View>
       </View>
       {changed && !valid ? (
         <Text style={[font.dim, { color: colour.down }]}>
-          {`Not a valid game to ${row.format}.`}
+          {`Không phải tỉ số hợp lệ cho trận tới ${row.format}.`}
         </Text>
       ) : null}
       <Button
         busy={act.isPending}
         disabled={!changed || !valid}
-        label="Correct the score"
+        label="Sửa tỉ số"
         onPress={() => act.mutate({ action: 'correct-score', gameId: row.id, scoreA: a, scoreB: b })}
         tone="quiet"
       />
 
       <Field
-        label="Why it is being removed"
+        label="Lý do gỡ trận"
         onChangeText={setReason}
-        placeholder="Never played"
+        placeholder="Không có trận này"
         value={reason}
       />
       <Button
         busy={act.isPending}
         disabled={reason.trim().length === 0}
-        label="Remove this game"
+        label="Gỡ trận này"
         onPress={() => act.mutate({ action: 'void', gameId: row.id, reason: reason.trim() })}
         tone="danger"
       />

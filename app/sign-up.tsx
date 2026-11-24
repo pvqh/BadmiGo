@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, Text } from 'react-native';
 import { signUp } from '../src/data/auth';
@@ -8,9 +9,8 @@ import { Field } from '../src/ui/components/field';
 import { useUsernameCheck } from '../src/ui/queries';
 import { colour, font, layout } from '../src/ui/theme';
 
-/** Matches minimum_password_length in supabase/config.toml. */
-
 export default function SignUp() {
+  const router = useRouter();
   const [handle, setHandle] = useState('');
   const [password, setPassword] = useState('');
 
@@ -22,13 +22,12 @@ export default function SignUp() {
   return (
     <KeyboardAvoidingView behavior="padding" style={layout.screen}>
       <ScrollView contentContainerStyle={layout.page} keyboardShouldPersistTaps="handled">
-
         <Field
           autoCapitalize="none"
-          autoCorrect={false}
           autoComplete="username"
-          hint="Lower case, and yours for good. If you forget your password, an admin sets you a temporary one."
-          label="Username"
+          autoCorrect={false}
+          hint="3 đến 20 ký tự: chữ hoa, chữ thường, số và _ . - đều được. Khi đăng nhập không cần gõ đúng chữ hoa."
+          label="Tên đăng nhập"
           onChangeText={setHandle}
           placeholder="HungDepTrai01"
           problem={check.isError ? check.error.message : (check.data ?? null)}
@@ -37,12 +36,12 @@ export default function SignUp() {
 
         <Field
           autoCapitalize="none"
-          //autoComplete="new-password"
-          hint={`Ít nhất ${MIN_PASSWORD} ký tự.`}
-          label="Password"
+          autoComplete="new-password"
+          hint={`Ít nhất ${MIN_PASSWORD} ký tự. Nếu quên, admin sẽ cấp mật khẩu tạm.`}
+          label="Mật khẩu"
           onChangeText={setPassword}
-          secureTextEntry
           placeholder="••••••••"
+          secureTextEntry
           value={password}
         />
 
@@ -53,9 +52,19 @@ export default function SignUp() {
         <Button
           busy={signingUp.isPending}
           disabled={!handleReady || password.length < MIN_PASSWORD}
-          label="Create account"
+          label={typeof check.data === 'string' ? 'Chọn tên đăng nhập khác' : 'Tạo tài khoản'}
           onPress={() => signingUp.mutate()}
         />
+        <Text style={[font.body, { textAlign: 'center' }]}>
+          {'Đã có tài khoản? '}
+          <Text
+            accessibilityRole="link"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/sign-in'))}
+            style={{ color: colour.courtInk, fontWeight: '700' }}
+          >
+            Đăng nhập
+          </Text>
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

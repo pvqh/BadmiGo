@@ -1,6 +1,7 @@
 import { invoke, supabase, unwrap } from './client';
 import type { Database } from './database.types';
 import type { GameFormat, ProfileId } from '../domain/types';
+import { searchPlayers } from './ladder';
 
 export type Game = Database['public']['Tables']['games']['Row'];
 
@@ -8,9 +9,6 @@ export type Game = Database['public']['Tables']['games']['Row'];
  * One call, because a game is nine rows and a phone cannot open a transaction. The
  * score is checked by src/domain/validation before this is reached; the server adds
  * the structural guards and the daily cap.
- *
- * A photo is uploaded first, into the logger's own folder, which is the only place
- * the storage policy and the games table will accept it from.
  */
 export async function logGame(input: {
   readonly format: GameFormat;
@@ -18,12 +16,7 @@ export async function logGame(input: {
   readonly sideB: readonly [ProfileId, ProfileId];
   readonly scoreA: number;
   readonly scoreB: number;
-  readonly loggerId: ProfileId;
-  readonly photo: Blob | null;
 }): Promise<string> {
-  const photoPath =
-    input.photo === null ? undefined : await uploadPhoto(input.loggerId, input.photo);
-
   const gameId = unwrap(
     await supabase.rpc('log_game', {
       p_format: input.format,
@@ -31,7 +24,6 @@ export async function logGame(input: {
       p_side_b: [...input.sideB],
       p_score_a: input.scoreA,
       p_score_b: input.scoreB,
-      p_photo_path: photoPath,
     }),
   );
 
@@ -41,24 +33,6 @@ export async function logGame(input: {
   });
 
   return gameId;
-}
-
-const PHOTO_BUCKET = 'game-photos';
-
-async function uploadPhoto(loggerId: ProfileId, photo: Blob): Promise<string> {
-  const path = `${loggerId}/${crypto.randomUUID()}.jpg`;
-  const { error } = await supabase.storage
-    .from(PHOTO_BUCKET)
-    .upload(path, photo, { contentType: 'image/jpeg' });
-  if (error !== null) throw new Error(error.message);
-  return path;
-}
-
-/** The bucket is private, so a photo is shown through a link that expires. */
-export async function photoUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, 3600);
-  if (error !== null) throw new Error(error.message);
-  return data.signedUrl;
 }
 
 export type Answer = 'confirm' | 'dispute' | 'cancel';
@@ -78,7 +52,7 @@ export function answerGame(gameId: string, answer: Answer): Promise<AnswerOutcom
 
 const FEED_SHAPE = `
   id, format, score_a, score_b, winning_side, played_at, created_at, status, void_reason,
-  photo_path, logger_id,
+  logger_id,
   game_participants (profile_id, side, profiles (username, display_name)),
   game_confirmations (profile_id, state, responded_at),
   rating_history (profile_id, display_before, display_after)
@@ -94,6 +68,59 @@ export async function readFeed(limit = 30, before?: string) {
     .limit(limit);
 
   return unwrap(await (before === undefined ? query : query.lt('played_at', before)));
+}
+
+export interface FeedSearch {
+  /** Part of a display name or username; empty means anyone. */
+  readonly term: string;
+  /** A day as a date input gives it, `YYYY-MM-DD`, or null for any day. */
+  readonly day: string | null;
+}
+
+/** Enough for a whole session day, which runs to about forty games. */
+const SEARCH_LIMIT = 100;
+
+/**
+ * Story 46a: confirmed games by player name, by day, or both, newest first. Names are
+ * matched as the player picker matches them, then the games are filtered through an
+ * aliased embed for the reason given on readMyPendingGames. The embed is selected
+ * even with no name, so both kinds of search return the same row type.
+ */
+export async function searchFeed({ term, day }: FeedSearch) {
+  let query = supabase
+    .from('games')
+    .select(`${FEED_SHAPE}, who:game_participants!inner (profile_id)`)
+    .eq('status', 'confirmed')
+    .order('played_at', { ascending: false })
+    .limit(SEARCH_LIMIT);
+
+  if (term.trim().length > 0) {
+    const players = await searchPlayers(term);
+    if (players.length === 0) return [];
+    query = query.in(
+      'who.profile_id',
+      players.map((player) => player.id),
+    );
+  }
+
+  if (day !== null) {
+    const { from, to } = dayBounds(day);
+    query = query.gte('played_at', from).lt('played_at', to);
+  }
+
+  return unwrap(await query);
+}
+
+/**
+ * Midnight to midnight on the phone's own clock, which is the day the feed means by
+ * "today" and "yesterday": a game at 23:30 on Saturday belongs to Saturday.
+ */
+function dayBounds(day: string): { readonly from: string; readonly to: string } {
+  const [year, month, date] = day.split('-').map(Number);
+  return {
+    from: new Date(year, month - 1, date).toISOString(),
+    to: new Date(year, month - 1, date + 1).toISOString(),
+  };
 }
 
 /**

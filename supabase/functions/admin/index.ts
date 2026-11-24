@@ -18,13 +18,13 @@ Deno.serve(async (request) => {
   const service = serviceClient();
 
   const callerId = await callerProfileId(service, request);
-  if (callerId === null) return json({ error: 'sign in first' }, 401);
+  if (callerId === null) return json({ error: 'Hãy đăng nhập trước' }, 401);
   const caller = await service.from('profiles').select('is_admin').eq('id', callerId).maybeSingle();
   if (caller.error !== null) return json({ error: caller.error.message }, 500);
-  if (caller.data?.is_admin !== true) return json({ error: 'admins only' }, 403);
+  if (caller.data?.is_admin !== true) return json({ error: 'Chỉ admin mới làm được việc này' }, 403);
 
   const body = parse(await request.json().catch(() => null));
-  if (body === null) return json({ error: 'not an admin action this function knows' }, 400);
+  if (body === null) return json({ error: 'Không có thao tác quản trị này' }, 400);
 
   const problem = await perform(service, body);
   if (problem !== null) return json({ error: problem }, 409);
@@ -90,12 +90,12 @@ async function correctScore(
 ): Promise<string | null> {
   const game = await service.from('games').select('format, status').eq('id', gameId).maybeSingle();
   if (game.error !== null) return game.error.message;
-  if (game.data === null) return 'no such game';
-  if (game.data.status === 'voided') return 'a voided game cannot be corrected';
+  if (game.data === null) return 'Không tìm thấy trận này';
+  if (game.data.status === 'voided') return 'Trận đã gỡ thì không sửa được';
   const format = asGameFormat(game.data.format);
-  if (format === null) return `a game to ${game.data.format} is not a club format`;
+  if (format === null) return `Câu lạc bộ không đánh trận tới ${game.data.format}`;
   if (!validateScore(format, scoreA, scoreB)) {
-    return `${scoreA}–${scoreB} is not a valid game to ${format}`;
+    return `${scoreA}–${scoreB} không phải tỉ số hợp lệ cho trận tới ${format}`;
   }
 
   const { error } = await service

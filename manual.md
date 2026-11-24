@@ -66,7 +66,7 @@ why a bad score is fixed by correcting the game instead of patching numbers.
 | The rating engine, lifecycle, validation, stats, flags, recap | **Done.** 214 tests pass. |
 | The simulation that proves the ratings are meaningful | **Done.** Spearman 0.883. |
 | Database, security, username sign-in, all six Edge Functions | **Done.** Proven by the smoke test. |
-| The screens | **Done.** Ladder, feed, log (with photo), profiles, settings, admin. |
+| The screens | **Done.** Ladder, feed (with search), log, profiles, settings, admin. |
 | Home-screen install, and the deep links GitHub Pages needs | **Done.** Checked on a local copy of the Pages setup. |
 | Web Push notifications | **Built and checked as far as a PC can.** Real delivery needs the live site and a phone; see Part 13. |
 | The home-screen widget | **Dropped** on 2026-11-24, with the Apple membership. |
@@ -479,7 +479,7 @@ Click **Table Editor** in the left sidebar. The tables, in the order worth readi
 
 - `profiles` — one row per club member. Username, display name, gender, seed tier,
   admin flag. *Having a row here is what makes an account a club member.*
-- `games` — one row per badminton game. Scores, format, status, an optional photo, and
+- `games` — one row per badminton game. Scores, format, status, and
   two timestamps: `played_at` (what the replay orders by) and `created_at` (what the
   24-hour confirmation clock runs from).
 - `game_participants` — exactly four rows per game: who played, on which side.
@@ -501,7 +501,8 @@ Click **Table Editor** in the left sidebar. The tables, in the order worth readi
   can read it.
 - `notification_preferences` — each member's four switches.
 
-Photos live under **Storage → game-photos**, one folder per member.
+There are no game photos any more. If **Storage → game-photos** still exists on the
+live project, delete it there: it is left over from before 2026-11-25.
 
 Now click **SQL Editor** and try this — it is the single most useful query for
 understanding the system:
@@ -554,7 +555,6 @@ minimum, four to see a rating actually move.
    - Enter a legal score and each player's stake appears: what they stand to gain or
      lose. It is an estimate on purpose: the real number is computed on the server once
      all four agree.
-   - *Add a photo* is optional. The photo is shrunk in the browser before it uploads.
    - In the player picker, *Invite someone new* shares (or copies) the sign-up link.
 5. **Submit.** The other three now have 24 hours. Your lineup stays put so the next
    game is just a score.
@@ -777,8 +777,8 @@ to know:
 
 - Supabase free projects pause after about a week of inactivity. Twice-weekly use
   comfortably prevents it.
-- Storage (game photos) has a 1 GB free limit. Photos are shrunk to well under 512 KB
-  each, so that is thousands of photos.
+- Nothing is kept in Storage, so its 1 GB free limit is not a concern. Video would be,
+  which is why it is not built.
 
 ---
 

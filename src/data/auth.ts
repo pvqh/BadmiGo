@@ -1,4 +1,4 @@
-import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
+import { isAuthApiError, isAuthSessionMissingError, type AuthError } from '@supabase/supabase-js';
 import { supabase, unwrap } from './client';
 import type { Database } from './database.types';
 import type { Tier } from '../domain/types';
@@ -17,20 +17,39 @@ export function authEmailFor(username: string): string {
   return `${username.trim().toLowerCase()}@${USERNAME_EMAIL_DOMAIN}`;
 }
 
+/** Supabase Auth's reasons, in the club's language; anything unexpected as it came. */
+const AUTH_PROBLEM: Readonly<Record<string, string>> = {
+  invalid_credentials: 'Sai tên đăng nhập hoặc mật khẩu.',
+  user_already_exists: 'Tên đăng nhập này đã có người dùng. Hãy đăng nhập.',
+  weak_password: 'Mật khẩu quá ngắn.',
+  over_request_rate_limit: 'Thử quá nhiều lần. Đợi một lát rồi thử lại.',
+};
+
+function authProblem(error: AuthError): Error {
+  return new Error((error.code === undefined ? undefined : AUTH_PROBLEM[error.code]) ?? error.message);
+}
+
+/** Any capitalisation signs in: the address, and so the password, is the lower-cased handle. */
 export async function signIn(username: string, password: string): Promise<void> {
   const { error } = await supabase.auth.signInWithPassword({
     email: authEmailFor(username),
     password,
   });
-  if (error !== null) throw new Error(error.message);
+  if (error !== null) throw authProblem(error);
 }
 
+/**
+ * The handle as typed, capitals and all, rides along in the account's metadata, since
+ * the auth email can only hold it in lower case. public.create_my_profile copies it
+ * into the profile once it has checked it spells the same handle.
+ */
 export async function signUp(username: string, password: string): Promise<void> {
   const { error } = await supabase.auth.signUp({
     email: authEmailFor(username),
     password,
+    options: { data: { username: username.trim() } },
   });
-  if (error !== null) throw new Error(error.message);
+  if (error !== null) throw authProblem(error);
 }
 
 /**
@@ -53,6 +72,18 @@ export async function signOut(): Promise<void> {
 
 export async function changePassword(password: string): Promise<void> {
   const { error } = await supabase.auth.updateUser({ password });
+  if (error !== null) throw authProblem(error);
+}
+
+/**
+ * Story 6a. Trimmed here because the table checks the trimmed length but stores what
+ * it is given, and a name with a stray space would look like a different person.
+ */
+export async function changeDisplayName(profileId: string, displayName: string): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ display_name: displayName.trim() })
+    .eq('id', profileId);
   if (error !== null) throw new Error(error.message);
 }
 
@@ -77,28 +108,31 @@ export async function createMyProfile(input: {
   readonly displayName: string;
   readonly gender: Gender;
   readonly seedTier: Tier;
+  readonly avatarPath: string | null;
 }): Promise<Profile> {
   return unwrap(
     await supabase.rpc('create_my_profile', {
       p_display_name: input.displayName,
       p_gender: input.gender,
       p_seed_tier: input.seedTier,
+      ...(input.avatarPath === null ? {} : { p_avatar_path: input.avatarPath }),
     }),
   );
 }
 
 /**
- * The handle this account was created with, read back out of its auth email, the
- * same way public.create_my_profile derives it, so the screen shows what the profile
- * will actually hold.
+ * The handle this account was created with, worked out the way
+ * public.create_my_profile does it, so the screen shows what the profile will hold:
+ * the capitals typed at signup if they spell the auth email's handle, else the handle.
  */
 export async function myUsername(): Promise<string> {
   const { data, error } = await supabase.auth.getUser();
   if (error !== null) throw new Error(error.message);
 
   const [handle, domain] = (data.user.email ?? '').split('@');
-  if (domain !== USERNAME_EMAIL_DOMAIN) throw new Error('this account has no username');
-  return handle;
+  if (domain !== USERNAME_EMAIL_DOMAIN) throw new Error('Tài khoản này không có tên đăng nhập');
+  const typed: unknown = data.user.user_metadata.username;
+  return typeof typed === 'string' && typed.trim().toLowerCase() === handle ? typed.trim() : handle;
 }
 
 /** Null while an account exists but has not finished signing up. */

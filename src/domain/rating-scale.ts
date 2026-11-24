@@ -60,6 +60,29 @@ export function tierFor(rating: number): Tier {
   return 'newbie';
 }
 
+const TIER_LADDER = [
+  { tier: 'y', floor: TIER_FLOOR.y },
+  { tier: 'tby', floor: TIER_FLOOR.tby },
+  { tier: 'tb-plus', floor: TIER_FLOOR['tb-plus'] },
+  { tier: 'kha', floor: TIER_FLOOR.kha },
+] as const satisfies readonly { readonly tier: Tier; readonly floor: number }[];
+
+/**
+ * The tier above a display rating, its floor, and the floor of the band the rating is
+ * in now, so a profile can draw progress through the band. Null at the top.
+ */
+export function nextTier(
+  rating: number,
+): { readonly tier: Tier; readonly floor: number; readonly from: number } | null {
+  const index = TIER_LADDER.findIndex((band) => rating < band.floor);
+  if (index === -1) return null;
+  return {
+    tier: TIER_LADDER[index].tier,
+    floor: TIER_LADDER[index].floor,
+    from: index === 0 ? 0 : TIER_LADDER[index - 1].floor,
+  };
+}
+
 /**
  * Applied when a returning player next plays, never while they are away, so an
  * inactive player's stored rating is preserved exactly as they left it.

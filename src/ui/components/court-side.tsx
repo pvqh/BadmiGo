@@ -33,7 +33,7 @@ export function CourtSide({
   return (
     <View style={style.side}>
       <View style={{ flex: 1, gap: space.row }}>
-        <Text style={font.dim}>{label}</Text>
+        <Text style={[font.dim, { color: colour.onCourtDim, fontWeight: '600' }]}>{label}</Text>
         {players.map((player, slot) => (
           <Slot
             key={slot}
@@ -46,12 +46,12 @@ export function CourtSide({
         ))}
       </View>
       <TextInput
-        accessibilityLabel={`${label} score`}
+        accessibilityLabel={`Điểm ${label.toLowerCase()}`}
         keyboardType="number-pad"
         maxLength={2}
         onChangeText={onScore}
-        placeholder="–"
-        placeholderTextColor={colour.dim}
+        placeholder="0"
+        placeholderTextColor={colour.line}
         selectTextOnFocus
         style={[font.score, style.score]}
         value={score}
@@ -80,34 +80,35 @@ function Slot({
         onPress={onPick}
         style={({ pressed }) => [style.slot, style.empty, pressed ? style.pressed : null]}
       >
-        <Ionicons color={colour.accent} name="add" size={18} />
-        <Text style={[font.body, { color: colour.accent }]}>Add player</Text>
+        <Ionicons color={colour.onCourt} name="add" size={20} />
+        <Text style={[font.body, { color: colour.onCourt, fontWeight: '600' }]}>Thêm người</Text>
       </Pressable>
     );
   }
 
   return (
-    <View style={[style.slot, locked ? style.mine : null]}>
+    <View style={style.slot}>
+      {locked ? <View style={style.mine} /> : null}
       <View style={{ flex: 1 }}>
-        <Text numberOfLines={1} style={font.body}>
+        <Text numberOfLines={1} style={[font.body, { fontWeight: '700' }]}>
           {player.displayName}
         </Text>
         {stake === undefined ? null : (
-          <Text style={font.dim}>
-            <Text style={{ color: colour.up }}>
+          <Text style={[font.dim, { fontSize: 13 }]}>
+            {'thắng '}
+            <Text style={{ color: colour.up, fontWeight: '700' }}>
               {describeDelta(stake.displayBefore, stake.displayIfWon)}
             </Text>
-            {' if won, '}
-            <Text style={{ color: colour.down }}>
+            {', thua '}
+            <Text style={{ color: colour.down, fontWeight: '700' }}>
               {describeDelta(stake.displayBefore, stake.displayIfLost)}
             </Text>
-            {' if lost'}
           </Text>
         )}
       </View>
       {locked ? null : (
         <Pressable
-          accessibilityLabel={`Remove ${player.displayName}`}
+          accessibilityLabel={`Bỏ ${player.displayName}`}
           accessibilityRole="button"
           hitSlop={12}
           onPress={onClear}
@@ -121,30 +122,37 @@ function Slot({
 }
 
 const style = StyleSheet.create({
-  side: { flexDirection: 'row', alignItems: 'center', gap: space.gap, padding: space.gap },
+  side: { flexDirection: 'row', alignItems: 'stretch', gap: space.row, padding: space.gap },
   slot: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.tight,
-    minHeight: 52,
+    gap: space.row,
+    minHeight: 54,
     paddingHorizontal: space.gap,
     paddingVertical: space.tight,
     borderRadius: radius.field,
-    backgroundColor: colour.raised,
+    backgroundColor: colour.card,
   },
   empty: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
+    borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: colour.accent,
+    borderColor: colour.onCourtDim,
   },
-  mine: { borderLeftWidth: 3, borderLeftColor: colour.accent },
+  mine: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colour.onShuttle,
+    backgroundColor: colour.shuttle,
+  },
   score: {
-    width: 84,
-    minHeight: 72,
+    width: 92,
+    fontSize: 52,
     textAlign: 'center',
-    borderRadius: radius.field,
-    backgroundColor: colour.deep,
+    borderRadius: radius.card,
+    backgroundColor: colour.card,
   },
   pressed: { opacity: 0.6 },
 });

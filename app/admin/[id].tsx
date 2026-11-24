@@ -12,8 +12,6 @@ import { useMember } from '../../src/ui/session';
 import { colour, font, layout, space } from '../../src/ui/theme';
 import { TIER_LABEL } from '../../src/ui/vocabulary';
 
-/** Matches minimum_password_length in supabase/config.toml. */
-
 /** One member's account, as only an admin can change it (stories 5, 68, 69, 72). */
 export default function MemberAdmin() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -33,7 +31,7 @@ export default function MemberAdmin() {
   }
 
   const member = members.data.find((candidate) => candidate.id === id);
-  if (member === undefined) return <Nothing message="This account no longer exists." />;
+  if (member === undefined) return <Nothing message="Tài khoản này không còn nữa." />;
 
   const term = search.trim().toLowerCase();
   const others = members.data.filter(
@@ -57,18 +55,18 @@ export default function MemberAdmin() {
       {act.isError ? (
         <Text style={[font.dim, { color: colour.down }]}>{act.error.message}</Text>
       ) : null}
-      {act.isSuccess ? <Text style={[font.dim, { color: colour.up }]}>Done.</Text> : null}
+      {act.isSuccess ? <Text style={[font.dim, { color: colour.up }]}>Xong.</Text> : null}
 
       <View style={layout.card}>
-        <Text style={font.heading}>Seed tier</Text>
+        <Text style={font.heading}>Trình độ xuất phát</Text>
         <Choice
           onChange={(seedTier) => act.mutate({ action: 'set-seed-tier', profileId: member.id, seedTier })}
           options={TIERS.map((tier) => ({ value: tier, label: TIER_LABEL[tier] }))}
           value={member.seed_tier}
         />
         <Text style={font.dim}>
-          Where their rating started. Changing it replays the whole club, so every rating
-          since moves with it.
+          Điểm xuất phát của người này. Đổi sẽ tính lại cả câu lạc bộ, nên mọi điểm từ đó
+          đến nay đều thay đổi theo.
         </Text>
       </View>
 
@@ -78,15 +76,15 @@ export default function MemberAdmin() {
           <Switch
             disabled={promote.isPending || member.id === me.id}
             onValueChange={(isAdmin) => promote.mutate({ profileId: member.id, isAdmin })}
-            thumbColor={colour.text}
-            trackColor={{ true: colour.accent, false: colour.line }}
+            thumbColor={colour.onCourt}
+            trackColor={{ true: colour.court, false: colour.switchOff }}
             value={member.is_admin}
           />
         </View>
         <Text style={font.dim}>
           {member.id === me.id
-            ? 'Another admin has to take this away from you, so the club is never left without one.'
-            : 'Admins can fix scores, remove games and change accounts.'}
+            ? 'Phải có admin khác gỡ quyền này của bạn, để câu lạc bộ luôn có admin.'
+            : 'Admin có thể sửa tỉ số, gỡ trận và chỉnh tài khoản.'}
         </Text>
         {promote.isError ? (
           <Text style={[font.dim, { color: colour.down }]}>{promote.error.message}</Text>
@@ -94,19 +92,19 @@ export default function MemberAdmin() {
       </View>
 
       <View style={layout.card}>
-        <Text style={font.heading}>Temporary password</Text>
+        <Text style={font.heading}>Mật khẩu tạm</Text>
         <Field
           autoCapitalize="none"
           autoCorrect={false}
-          hint={`At least ${MIN_PASSWORD} characters. Tell them in person; they change it in Settings.`}
-          label="New password"
+          hint={`Ít nhất ${MIN_PASSWORD} ký tự. Báo trực tiếp cho họ; họ tự đổi trong Cài đặt.`}
+          label="Mật khẩu mới"
           onChangeText={setPassword}
           value={password}
         />
         <Button
           busy={act.isPending}
           disabled={password.length < MIN_PASSWORD}
-          label="Set password"
+          label="Đặt mật khẩu"
           onPress={() =>
             act.mutate(
               { action: 'reset-password', profileId: member.id, password },
@@ -117,19 +115,19 @@ export default function MemberAdmin() {
       </View>
 
       <View style={layout.card}>
-        <Text style={font.heading}>Duplicate account</Text>
+        <Text style={font.heading}>Tài khoản trùng</Text>
         <Text style={font.dim}>
-          If this is a second account for someone, merge it into the one they keep. Its
-          games move across and this account is deleted.
+          Nếu đây là tài khoản thứ hai của ai đó, hãy gộp vào tài khoản họ giữ lại. Các
+          trận được chuyển sang và tài khoản này bị xoá.
         </Text>
         {keep === null ? (
           <>
             <Field
               autoCapitalize="none"
               autoCorrect={false}
-              label="The account they keep"
+              label="Tài khoản giữ lại"
               onChangeText={setSearch}
-              placeholder="Search by name"
+              placeholder="Tìm theo tên"
               value={search}
             />
             {others.map((other) => (
@@ -143,12 +141,12 @@ export default function MemberAdmin() {
         ) : (
           <View style={{ gap: space.row }}>
             <Text style={font.body}>
-              Merge @{member.username} into @{keep.username}? This cannot be undone.
+              Gộp @{member.username} vào @{keep.username}? Không thể hoàn tác.
             </Text>
             <ButtonRow>
               <Button
                 busy={act.isPending}
-                label="Merge"
+                label="Gộp"
                 onPress={() =>
                   act.mutate(
                     { action: 'merge', keepId: keep.id, mergeId: member.id },
@@ -157,7 +155,7 @@ export default function MemberAdmin() {
                 }
                 tone="danger"
               />
-              <Button label="Not this one" onPress={() => setKeep(null)} tone="quiet" />
+              <Button label="Không phải người này" onPress={() => setKeep(null)} tone="quiet" />
             </ButtonRow>
           </View>
         )}

@@ -1,9 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { GameRow } from '../../data/games';
 import { answerOf } from '../game-row';
 import { useMember } from '../session';
-import { colour, font, layout, radius, space } from '../theme';
+import { colour, font, radius, space } from '../theme';
 
 /**
  * Story 28: a member who missed the push still sees, on opening the app, that
@@ -25,26 +26,28 @@ export function PendingBanner({ games }: { readonly games: readonly GameRow[] })
       onPress={() =>
         owed.length === 1 ? router.push(`/game/${first.id}`) : router.push('/feed')
       }
-      style={({ pressed }) => [style.banner, pressed ? { opacity: 0.8 } : null]}
+      style={({ pressed }) => [style.banner, pressed ? { opacity: 0.85 } : null]}
     >
-      <View style={layout.spread}>
-        <Text style={[font.heading, { color: colour.onAccent }]}>
-          {owed.length === 1 ? 'Confirm your game' : `Confirm ${owed.length} games`}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[font.heading, { color: colour.onCourt }]}>
+          {owed.length === 1 ? 'Có 1 trận chờ bạn xác nhận' : `Có ${owed.length} trận chờ bạn xác nhận`}
         </Text>
-        <Text style={[font.body, { color: colour.onAccent }]}>›</Text>
+        <Text style={[font.dim, { color: colour.onCourtDim }]}>
+          Kiểm tra tỉ số để bảng xếp hạng được cập nhật.
+        </Text>
       </View>
-      <Text style={[font.dim, { color: colour.onAccent }]}>
-        Check the score so the ladder can move.
-      </Text>
+      <Ionicons color={colour.onCourt} name="chevron-forward" size={22} />
     </Pressable>
   );
 }
 
 const style = StyleSheet.create({
   banner: {
-    backgroundColor: colour.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.row,
+    backgroundColor: colour.court,
     borderRadius: radius.card,
     padding: space.gap,
-    gap: space.tight,
   },
 });

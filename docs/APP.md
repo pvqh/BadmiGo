@@ -23,17 +23,20 @@ src/domain/            pure; the screens read from it and never duplicate it
 ```
 app/_layout.tsx          providers and the gate
 app/(tabs)/index.tsx     the ladder
-app/(tabs)/feed.tsx      the club feed, with the member's unsettled games on top
-                         and "Confirm all" when they owe two or more
-app/(tabs)/log.tsx       logging a game, with an optional photo
+app/(tabs)/feed.tsx      the club feed, with the member's unsettled games on top,
+                         "Confirm all" when they owe two or more, and a search
+                         by player name and day
+app/(tabs)/log.tsx       logging a game
 app/(tabs)/me.tsx        the member's own profile
-app/(tabs)/settings.tsx  notifications, password, sign-out, and the way into admin
+app/(tabs)/settings.tsx  avatar, display name, notifications, password, sign-out,
+                         and the way into admin
 app/game/[id].tsx        one game: answers, confirm, dispute, cancel; admin fixes
 app/player/[id].tsx      anyone's profile
 app/admin/index.tsx      admin only: flagged games and the member list
 app/admin/[id].tsx       admin only: one member's seed tier, admin rights,
                          temporary password and merge
-app/sign-in.tsx          and sign-up, create-profile
+app/sign-in.tsx          and sign-up, create-profile (avatar, and a way back to
+                         sign-in for the wrong account)
 ```
 
 Three rules shape all of it.

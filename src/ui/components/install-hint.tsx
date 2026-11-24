@@ -11,15 +11,9 @@ export function InstallHint() {
 
   return (
     <View style={layout.card}>
-      <Text style={font.heading}>Add it to your home screen</Text>
+      <Text style={font.heading}>Thêm vào màn hình chính</Text>
       <Text style={font.body}>
-        1. Tap the Share button at the bottom of Safari.{'\n'}
-        2. Choose "Add to Home Screen", then "Add".{'\n'}
-        3. Open the ladder from the new icon.
-      </Text>
-      <Text style={font.dim}>
-        It then opens full-screen like an app, and it is the only way an iPhone will
-        let it send you notifications.
+        {'1. Bấm nút Chia sẻ ở cuối Safari.\n2. Chọn "Thêm vào MH chính", rồi "Thêm".\n3. Mở bảng xếp hạng từ biểu tượng mới.'}
       </Text>
     </View>
   );

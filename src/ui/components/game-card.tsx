@@ -9,7 +9,7 @@ import {
   winnerOf,
   type Player,
 } from '../game-row';
-import { colour, font, layout } from '../theme';
+import { colour, font, layout, space } from '../theme';
 import { describeDeadline, describeDelta, describeWhen } from '../vocabulary';
 import { StatusChip } from './badge';
 
@@ -37,22 +37,18 @@ export function GameCard({
       accessibilityRole={onPress === undefined ? undefined : 'button'}
       disabled={onPress === undefined}
       onPress={onPress}
-      style={({ pressed }) => [layout.card, pressed ? { opacity: 0.7 } : null]}
+      style={({ pressed }) => [layout.card, { gap: space.tight }, pressed ? { opacity: 0.7 } : null]}
     >
-      <View style={layout.spread}>
-        <Text style={font.dim}>{`${describeWhen(row.played_at, now)}, game to ${row.format}`}</Text>
-        {row.status === 'confirmed' ? null : <StatusChip status={row.status} />}
-      </View>
+      {row.status === 'confirmed' ? null : <StatusChip status={row.status} />}
 
       <SideLine players={a} row={row} score={row.score_a} viewerId={viewerId} won={winner === 'a'} />
-      <View style={layout.rule} />
       <SideLine players={b} row={row} score={row.score_b} viewerId={viewerId} won={winner === 'b'} />
 
-      {row.status === 'pending' ? (
-        <Text style={font.dim}>
-          {`${4 - stillToAnswer(row)} of 4 confirmed, ${describeDeadline(autoAcceptsIn(row, now))}`}
-        </Text>
-      ) : null}
+      <Text style={[font.dim, { fontSize: 12 }]}>
+        {row.status === 'pending'
+          ? `${4 - stillToAnswer(row)}/4 đã xác nhận, ${describeDeadline(autoAcceptsIn(row, now))}`
+          : `${describeWhen(row.played_at, now)}, đánh tới ${row.format}`}
+      </Text>
     </Pressable>
   );
 }
@@ -72,7 +68,7 @@ function SideLine({
 }) {
   return (
     <View style={layout.spread}>
-      <View style={{ flex: 1, gap: 2 }}>
+      <View style={style.names}>
         {players.map((player) => (
           <Name key={player.profileId} player={player} row={row} viewerId={viewerId} won={won} />
         ))}
@@ -98,12 +94,12 @@ function Name({
   const delta = move === null ? 0 : move.display_after - move.display_before;
 
   return (
-    <View style={layout.row}>
+    <View style={[layout.row, { gap: 4, flexShrink: 1 }]}>
       <Text
         numberOfLines={1}
         style={[font.body, won ? style.won : style.lost, mine ? style.mine : null, { flexShrink: 1 }]}
       >
-        {mine ? 'You' : player.displayName}
+        {mine ? 'Bạn' : player.displayName}
       </Text>
       {move === null ? null : (
         <Text
@@ -121,9 +117,10 @@ function Name({
 }
 
 const style = StyleSheet.create({
-  won: { fontWeight: '600' },
+  names: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', columnGap: space.gap, rowGap: 2 },
+  won: { fontWeight: '700' },
   lost: { color: colour.dim },
-  mine: { color: colour.accent },
-  score: { fontSize: 36, minWidth: 48, textAlign: 'right' },
+  mine: { backgroundColor: colour.shuttleSoft, borderRadius: 4, paddingHorizontal: 4 },
+  score: { fontSize: 32, lineHeight: 36, minWidth: 48, textAlign: 'right' },
   delta: { fontSize: 15 },
 });

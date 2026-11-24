@@ -6,13 +6,13 @@ import type { GameFormat, Side } from '../../src/domain/types';
 import { validateProposedGame, type ValidationProblem } from '../../src/domain/validation';
 import { Button } from '../../src/ui/components/button';
 import { CourtSide } from '../../src/ui/components/court-side';
+import { ScreenTitle } from '../../src/ui/components/screen-title';
 import { Choice } from '../../src/ui/components/field';
-import { PhotoPicker } from '../../src/ui/components/photo-picker';
 import { PlayerPicker, type Pickable } from '../../src/ui/components/player-picker';
 import { useLogGame, useStrengths } from '../../src/ui/queries';
 import { useMember } from '../../src/ui/session';
 import { stakesFor } from '../../src/ui/stakes';
-import { colour, font, layout, radius } from '../../src/ui/theme';
+import { colour, font, layout, radius, space } from '../../src/ui/theme';
 
 interface Slot {
   readonly side: Side;
@@ -41,12 +41,11 @@ export default function LogGame() {
   const [scoreA, setScoreA] = useState('');
   const [scoreB, setScoreB] = useState('');
   const [picking, setPicking] = useState<Slot | null>(null);
-  const [photo, setPhoto] = useState<Blob | null>(null);
 
   const strengths = useStrengths();
   const logging = useLogGame(me.id);
 
-  const myself: Pickable = { profileId: me.id, displayName: 'You' };
+  const myself: Pickable = { profileId: me.id, displayName: 'Bạn' };
   const slots: readonly (Pickable | null)[] = [myself, partner, ...opponents];
   const lineup = everyone(slots);
   const scored = scoreA.length > 0 && scoreB.length > 0;
@@ -87,13 +86,12 @@ export default function LogGame() {
   const submit = () => {
     if (proposed === null || !ready) return;
     logging.mutate(
-      { ...proposed, loggerId: me.id, photo },
+      proposed,
       {
+        // The lineup carries over to the next game; only the score is cleared.
         onSuccess: () => {
           setScoreA('');
           setScoreB('');
-          // The lineup carries over to the next game; a photo belongs to this one.
-          setPhoto(null);
         },
       },
     );
@@ -102,8 +100,10 @@ export default function LogGame() {
   return (
     <KeyboardAvoidingView behavior="padding" style={layout.screen}>
       <ScrollView contentContainerStyle={layout.page} keyboardShouldPersistTaps="handled">
+        <ScreenTitle title="Ghi trận" />
+
         <View style={layout.row}>
-          <Text style={font.body}>Game to</Text>
+          <Text style={[font.body, { fontWeight: '600' }]}>Đánh tới</Text>
           <View style={{ flex: 1 }}>
             <Choice onChange={setFormat} options={FORMATS} value={format} />
           </View>
@@ -111,17 +111,7 @@ export default function LogGame() {
 
         <View style={style.court}>
           <CourtSide
-            label="Them"
-            onClear={(index) => setSlot({ side: 'b', index }, null)}
-            onPick={(index) => setPicking({ side: 'b', index })}
-            onScore={setScoreB}
-            players={opponents}
-            score={scoreB}
-            stakes={stakes}
-          />
-          <View style={style.net} />
-          <CourtSide
-            label="Us"
+            label="Đội bạn"
             locked={me.id}
             onClear={(index) => setSlot({ side: 'a', index }, null)}
             onPick={(index) => setPicking({ side: 'a', index })}
@@ -130,13 +120,25 @@ export default function LogGame() {
             score={scoreA}
             stakes={stakes}
           />
+          <View accessibilityElementsHidden importantForAccessibility="no" style={style.net}>
+            <View style={style.post} />
+            <View style={style.netLine} />
+            <View style={style.post} />
+          </View>
+          <CourtSide
+            label="Đối thủ"
+            onClear={(index) => setSlot({ side: 'b', index }, null)}
+            onPick={(index) => setPicking({ side: 'b', index })}
+            onScore={setScoreB}
+            players={opponents}
+            score={scoreB}
+            stakes={stakes}
+          />
         </View>
 
         <Verdict
-          missing={missing}
           problems={problems}
           ready={ready}
-          scored={scored}
           usWon={Number.parseInt(scoreA, 10) > Number.parseInt(scoreB, 10)}
         />
 
@@ -144,9 +146,12 @@ export default function LogGame() {
           <Text style={[font.body, { color: colour.down }]}>{logging.error.message}</Text>
         ) : null}
 
-        <PhotoPicker onChange={setPhoto} photo={photo} />
-
-        <Button busy={logging.isPending} disabled={!ready} label="Log game" onPress={submit} />
+        <Button
+          busy={logging.isPending}
+          disabled={!ready}
+          label={ready ? `Ghi trận ${scoreA}–${scoreB}` : stillNeeded(missing, scored, problems.length > 0)}
+          onPress={submit}
+        />
 
         {logging.isSuccess && !scored ? (
           <Pressable
@@ -155,12 +160,15 @@ export default function LogGame() {
             style={({ pressed }) => [layout.card, pressed ? { opacity: 0.7 } : null]}
           >
             <View style={layout.spread}>
-              <Text style={font.heading}>Logged</Text>
-              <Text style={[font.body, { color: colour.accent }]}>See game</Text>
+              <View style={layout.row}>
+                <Ionicons color={colour.up} name="checkmark-circle" size={22} />
+                <Text style={font.heading}>Đã ghi</Text>
+              </View>
+              <Text style={[font.body, { color: colour.courtInk, fontWeight: '600' }]}>Xem trận</Text>
             </View>
             <Text style={font.dim}>
-              The other three have 24 hours to confirm. Playing the same four again? Just
-              enter the next score.
+              Ba người còn lại có 24 giờ để xác nhận. Chơi tiếp với bốn người này? Chỉ cần
+              nhập tỉ số mới.
             </Text>
           </Pressable>
         ) : null}
@@ -179,16 +187,19 @@ export default function LogGame() {
   );
 }
 
-/** The one line that says what is still needed, or that the game is good to go. */
+/** What the log button says while it cannot be pressed: the next thing to do. */
+function stillNeeded(missing: number, scored: boolean, wrong: boolean): string {
+  if (missing > 0) return missing === 1 ? 'Thêm 1 người nữa' : `Thêm ${missing} người nữa`;
+  if (!scored) return 'Nhập tỉ số hai đội';
+  return wrong ? 'Sửa tỉ số' : 'Ghi trận';
+}
+
+/** Why a score is refused, or who won once it is good to go. */
 function Verdict({
-  missing,
-  scored,
   problems,
   ready,
   usWon,
 }: {
-  readonly missing: number;
-  readonly scored: boolean;
   readonly problems: readonly ValidationProblem[];
   readonly ready: boolean;
   readonly usWon: boolean;
@@ -207,17 +218,11 @@ function Verdict({
     return (
       <View style={layout.row}>
         <Ionicons color={colour.up} name="checkmark-circle" size={18} />
-        <Text style={font.body}>{usWon ? 'Your side won.' : 'Their side won.'}</Text>
+        <Text style={font.body}>{usWon ? 'Đội bạn thắng.' : 'Đối thủ thắng.'}</Text>
       </View>
     );
   }
-  return (
-    <Text style={font.dim}>
-      {missing > 0
-        ? `Add ${missing === 1 ? 'one more player' : `${missing} more players`}${scored ? '.' : ', then both scores.'}`
-        : 'Enter both scores.'}
-    </Text>
-  );
+  return null;
 }
 
 /** The four, or null while a slot is still empty. */
@@ -227,18 +232,20 @@ function everyone(slots: readonly (Pickable | null)[]): readonly Pickable[] | nu
 }
 
 function describeProblem(problem: ValidationProblem): string {
-  if (problem.kind === 'duplicate-player') return 'Someone is in the game twice.';
-  if (problem.kind === 'side-size') return 'Each side needs two players.';
-  return `That is not a finished game to ${problem.format}. The winner needs ${problem.format} and a two-point lead, unless it went to the cap.`;
+  if (problem.kind === 'duplicate-player') return 'Có người bị chọn hai lần.';
+  if (problem.kind === 'side-size') return 'Mỗi đội cần hai người.';
+  return `Tỉ số này chưa kết thúc trận tới ${problem.format}. Đội thắng cần ${problem.format} điểm và hơn hai điểm, trừ khi chạm điểm tối đa.`;
 }
 
 const style = StyleSheet.create({
   court: {
-    borderWidth: 2,
-    borderColor: colour.court,
-    borderRadius: radius.field,
-    backgroundColor: colour.card,
+    borderWidth: 3,
+    borderColor: colour.card,
+    borderRadius: radius.card + 4,
+    backgroundColor: colour.court,
     overflow: 'hidden',
   },
-  net: { height: 3, backgroundColor: colour.court },
+  net: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: space.gap },
+  netLine: { flex: 1, height: 0, borderTopWidth: 3, borderStyle: 'dashed', borderColor: colour.onCourt },
+  post: { width: 6, height: 14, borderRadius: 2, backgroundColor: colour.onCourt },
 });

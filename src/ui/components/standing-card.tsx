@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Standing } from '../standing';
-import { colour, font, layout, radius, space } from '../theme';
+import { colour, font, radius, space } from '../theme';
 
 /** The member's own place and the next name to catch; pressing it scrolls to their row. */
 export function StandingCard({
   standing,
+  rating,
   onPress,
 }: {
   readonly standing: Standing;
+  readonly rating: number;
   readonly onPress: () => void;
 }) {
   return (
@@ -16,14 +18,16 @@ export function StandingCard({
       accessibilityHint="Cuộn tới vị trí của bạn"
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [style.card, pressed ? { opacity: 0.8 } : null]}
+      style={({ pressed }) => [style.card, pressed ? { opacity: 0.85 } : null]}
     >
       <Text style={[font.score, style.rank]}>{`#${standing.rank}`}</Text>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={font.dim}>Hạng của bạn</Text>
-        <Text style={font.heading}>{describeChase(standing.next)}</Text>
+        <Text style={[font.dim, { color: colour.onShuttleDim, fontWeight: '600' }]}>
+          {`Hạng của bạn, ${rating} điểm`}
+        </Text>
+        <Text style={[font.heading, { color: colour.onShuttle }]}>{describeChase(standing.next)}</Text>
       </View>
-      <Ionicons color={colour.accent} name="locate" size={22} />
+      <Ionicons color={colour.onShuttle} name="locate" size={22} />
     </Pressable>
   );
 }
@@ -36,13 +40,13 @@ function describeChase(next: Standing['next']): string {
 
 const style = StyleSheet.create({
   card: {
-    ...layout.row,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: space.gap,
-    padding: space.gap,
+    paddingVertical: space.gap,
+    paddingHorizontal: space.page,
     borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colour.accent,
-    backgroundColor: colour.card,
+    backgroundColor: colour.shuttle,
   },
-  rank: { fontSize: 36, color: colour.accent },
+  rank: { fontSize: 40, lineHeight: 44, color: colour.onShuttle },
 });
