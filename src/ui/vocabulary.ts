@@ -12,9 +12,6 @@ export const TIER_LABEL: Record<Tier, string> = {
   kha: 'Khá',
 };
 
-/** Declared at signup, in the order a player would climb them. */
-export const TIER_ORDER: readonly Tier[] = ['newbie', 'y', 'tby', 'tb-plus', 'kha'];
-
 /** A rating move, written the way a feed reads it: +24, -11, or level. */
 export function describeDelta(before: number, after: number): string {
   const delta = after - before;

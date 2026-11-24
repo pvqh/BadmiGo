@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+//import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -28,7 +28,7 @@ export default function Ladder() {
   const router = useRouter();
   const me = useMember();
   const [filter, setFilter] = useState<Filter>('all');
-  const [showAway, setShowAway] = useState(false);
+  //const [showAway, setShowAway] = useState(false);
   const list = useRef<FlatList<LadderEntry>>(null);
 
   const ladder = useLadder();
@@ -46,7 +46,7 @@ export default function Ladder() {
   );
   const ranked = shown.filter((entry) => isAround(entry, now) && !entry.in_placement);
   const placing = shown.filter((entry) => isAround(entry, now) && entry.in_placement);
-  const away = shown.filter((entry) => !isAround(entry, now));
+  //const away = shown.filter((entry) => !isAround(entry, now));
   const standing = standingOf(ranked, me.id);
   // The podium is the whole club's; the men's and women's splits read as plain lists.
   const podiumSize = filter === 'all' ? 3 : 0;
@@ -77,7 +77,7 @@ export default function Ladder() {
       ListHeaderComponent={
         <View style={{ gap: space.gap, paddingBottom: space.row }}>
           {pending.data === undefined ? null : (
-            <PendingBanner games={pending.data.map((entry) => entry.games)} />
+            <PendingBanner games={pending.data} />
           )}
           <Choice
             onChange={setFilter}
@@ -109,14 +109,14 @@ export default function Ladder() {
         <View style={{ paddingTop: space.block, gap: space.row }}>
           {placing.length === 0 ? null : (
             <View>
-              <Text style={[font.heading, style.section]}>Still placing</Text>
+              <Text style={[font.heading, style.section]}>Chờ phân hạng</Text>
               <Text style={[font.dim, style.section]}>
-                A rank appears after their first few games.
+                Phân hạng sẽ được cập nhật sau khi bạn chơi đủ số trận đấu.
               </Text>
               {placing.map((entry) => row(entry))}
             </View>
           )}
-          {away.length === 0 ? null : (
+          {/* {away.length === 0 ? null : (
             <View>
               <Pressable
                 accessibilityRole="button"
@@ -129,7 +129,7 @@ export default function Ladder() {
               </Pressable>
               {showAway ? away.map((entry) => row(entry)) : null}
             </View>
-          )}
+          )} */}
         </View>
       }
       contentContainerStyle={layout.page}

@@ -102,13 +102,12 @@ export function PlayerProfile({
         <Figure label="Win rate" value={percent(stats.record)} />
         <Figure
           colour={expectationColour(perGame)}
-          label="vs expected"
+          label="PvE"
           value={perGame === null ? '—' : `${perGame > 0 ? '+' : ''}${(perGame * 100).toFixed(0)}%`}
         />
       </View>
       <Text style={font.dim}>
-        "vs expected" is how many more games they win than their opponents' ratings
-        predict. A strong partner cannot lift it.
+        "Performance vs Expectation (PvE)" là chỉ số hiệu suất so với kỳ vọng, cho thấy bạn thắng nhiều hay ít hơn so với dự đoán. Một đối thủ mạnh có thể nâng cao chỉ số này, nhưng một đồng đội mạnh không thể làm được điều đó. 
       </Text>
 
       <View style={layout.card}>
@@ -118,7 +117,7 @@ export function PlayerProfile({
 
       {stats.partners.length === 0 ? null : (
         <View style={layout.card}>
-          <Text style={font.heading}></Text>
+          <Text style={font.heading}>Best partners</Text>
           {best(stats.partners).map((partner) => (
             <PartnerRow key={partner.partnerId} name={stats.names.get(partner.partnerId)} partner={partner} />
           ))}

@@ -33,7 +33,7 @@ export default function RootLayout() {
  * current state belongs, which makes it the right answer for every group.
  */
 function Routes() {
-  const { status, problem, retry } = useSession();
+  const { status, profile, problem, retry } = useSession();
 
   if (status === 'loading') return <Pending />;
   if (status === 'unavailable') {
@@ -58,6 +58,10 @@ function Routes() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="game/[id]" options={{ title: 'Game' }} />
         <Stack.Screen name="player/[id]" options={{ title: '' }} />
+        <Stack.Protected guard={profile?.is_admin === true}>
+          <Stack.Screen name="admin/index" options={{ title: 'Club admin' }} />
+          <Stack.Screen name="admin/[id]" options={{ title: 'Member' }} />
+        </Stack.Protected>
       </Stack.Protected>
 
       <Stack.Protected guard={status === 'needs-profile'} redirectTo={home}>
@@ -67,7 +71,6 @@ function Routes() {
       <Stack.Protected guard={status === 'signed-out'} redirectTo={home}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         <Stack.Screen name="sign-up" options={{ title: 'Join the club' }} />
-        <Stack.Screen name="reset-password" options={{ title: 'Reset your password' }} />
       </Stack.Protected>
     </Stack>
   );

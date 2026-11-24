@@ -1,4 +1,8 @@
-import { createClient, type PostgrestSingleResponse } from '@supabase/supabase-js';
+import {
+  createClient,
+  FunctionsHttpError,
+  type PostgrestSingleResponse,
+} from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Database } from './database.types';
 
@@ -19,8 +23,9 @@ function required(name: string, value: string | undefined): string {
  * module's siblings and never touches it, so the rest of the app has no idea where
  * its data comes from.
  *
- * The session lives in AsyncStorage so a member stays signed in between sessions.
- * detectSessionInUrl is a browser concern and there is no browser here.
+ * The session lives in AsyncStorage, which is the browser's localStorage on the web,
+ * so a member stays signed in between sessions. detectSessionInUrl is off because no
+ * sign-in here ever arrives by link: accounts are username and password only.
  */
 export const supabase = createClient<Database>(
   required('EXPO_PUBLIC_SUPABASE_URL', process.env.EXPO_PUBLIC_SUPABASE_URL),
@@ -46,4 +51,21 @@ export function unwrap<T>(result: PostgrestSingleResponse<T>): T {
   if (result.error !== null) throw new Error(result.error.message);
   if (result.data === null) throw new Error('the request succeeded but returned nothing');
   return result.data;
+}
+
+/**
+ * Calls an Edge Function. A refusal comes back as the function's own sentence, because
+ * "Edge Function returned a non-2xx status code" tells nobody why it was refused.
+ */
+export async function invoke<T>(name: string, body: object): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T>(name, { body });
+  if (error !== null) {
+    const reply: unknown =
+      error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null;
+    const reason =
+      typeof reply === 'object' && reply !== null && 'error' in reply ? String(reply.error) : null;
+    throw new Error(reason ?? error.message);
+  }
+  if (data === null) throw new Error(`${name} returned nothing`);
+  return data;
 }

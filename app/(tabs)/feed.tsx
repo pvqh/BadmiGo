@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { Nothing, Pending, Problem } from '../../src/ui/components/async';
+import { Button } from '../../src/ui/components/button';
 import { GameCard } from '../../src/ui/components/game-card';
-import { useFeed, usePendingGames } from '../../src/ui/queries';
+import { answerOf } from '../../src/ui/game-row';
+import { useConfirmAll, useFeed, usePendingGames } from '../../src/ui/queries';
 import { useMember } from '../../src/ui/session';
 import { colour, font, layout, space } from '../../src/ui/theme';
 
@@ -17,6 +19,7 @@ export default function Feed() {
 
   const feed = useFeed();
   const pending = usePendingGames(me.id);
+  const confirmAll = useConfirmAll();
   const now = Date.now();
 
   if (feed.isPending) return <Pending />;
@@ -25,6 +28,7 @@ export default function Feed() {
   }
 
   const unsettled = pending.data ?? [];
+  const owed = unsettled.filter((row) => answerOf(row, me.id)?.state === 'pending');
 
   return (
     <FlatList
@@ -35,7 +39,17 @@ export default function Feed() {
         unsettled.length === 0 ? undefined : (
           <View style={{ gap: space.row, paddingBottom: space.gap }}>
             <Text style={font.heading}>Waiting for confirmation</Text>
-            {unsettled.map(({ games: row }) => (
+            {owed.length < 2 ? null : (
+              <Button
+                busy={confirmAll.isPending}
+                label={`Confirm all ${owed.length}`}
+                onPress={() => confirmAll.mutate(owed.map((row) => row.id))}
+              />
+            )}
+            {confirmAll.isError ? (
+              <Text style={[font.dim, { color: colour.down }]}>{confirmAll.error.message}</Text>
+            ) : null}
+            {unsettled.map((row) => (
               <GameCard
                 key={row.id}
                 now={now}

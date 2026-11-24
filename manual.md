@@ -3,8 +3,8 @@
 Written for someone who can read code but has not set this project up before.
 Nothing is assumed. Every command says what it does and why you are running it.
 
-Describes the repository as of **2026-11-04, 13:05**. The frontend was being written
-while this was produced, so if a screen differs from the description, trust the screen.
+Describes the repository as of **2026-11-24**, after the move from an iOS app to a
+web app on GitHub Pages. If a screen differs from the description, trust the screen.
 
 You are on **Windows**, and your default terminal is **PowerShell**. Every command
 below is written for PowerShell. Where a command would be different in Git Bash, both
@@ -25,53 +25,56 @@ Every command in this document assumes you are in that folder.
 
 It helps enormously to hold this picture before typing anything.
 
-There are **three separate computers** involved, and most confusion comes from not
+There are **four separate computers** involved, and most confusion comes from not
 knowing which one you are talking to.
 
 ```
    ┌──────────────────┐        ┌──────────────────────┐       ┌──────────────┐
-   │  1. YOUR PHONE   │  --->  │  2. THE BACKEND      │ <---  │ 3. YOUR PC   │
-   │  (or simulator)  │        │  Postgres + Auth +   │       │  the code,   │
-   │  runs the app    │        │  Edge Functions      │       │  the tests,  │
-   │                  │        │  (in Docker, local)  │       │  the CLI     │
+   │  1. A PHONE      │  --->  │  2. THE BACKEND      │ <---  │ 4. YOUR PC   │
+   │  Safari, the app │        │  Postgres + Auth +   │       │  the code,   │
+   │  on its home     │        │  Storage + Edge      │       │  the tests,  │
+   │  screen          │        │  Functions (Supabase)│       │  the CLI     │
    └──────────────────┘        └──────────────────────┘       └──────────────┘
+            ^                                                         │
+            │              ┌──────────────────────┐                   │
+            └───────────── │  3. GITHUB PAGES     │ <──── git push ───┘
+              loads the    │  serves the app's    │
+              app from     │  files, nothing else │
+                           └──────────────────────┘
 ```
 
-1. **The phone** runs the React Native app. It can log a game and confirm a game. It is
-   not trusted: it cannot compute or write a single rating.
-2. **The backend** is a real Postgres database plus Supabase's Auth and Edge Functions.
-   While you develop, all of it runs **inside Docker on your own PC**. Later the same
-   thing runs on Supabase's servers for free.
-3. **Your PC** holds the source code and runs the tests. The tests are the only part
+1. **The phone** runs the app in its browser. It can log a game and confirm a game. It
+   is not trusted: it cannot compute or write a single rating.
+2. **The backend** is a real Postgres database plus Supabase's Auth, Storage and Edge
+   Functions. While you develop, all of it runs **inside Docker on your own PC**. Later
+   the same thing runs on Supabase's servers for free.
+3. **GitHub Pages** hosts the app itself: plain HTML, JavaScript and icons, built by
+   GitHub every time you push. It runs no code of its own and holds no data.
+4. **Your PC** holds the source code and runs the tests. The tests are the only part
    that needs nothing else running at all.
 
 The single most important thing to understand: **the ratings are not stored decisions,
 they are recomputed.** Every time a game is confirmed, the server replays *every*
 confirmed game the club has ever played, from scratch, through the rating engine, and
 overwrites the whole ladder. That is why nothing can ever hand-edit a rating, and it is
-why a bad score can be fixed by correcting the game instead of patching numbers.
+why a bad score is fixed by correcting the game instead of patching numbers.
 
 ### What works today, honestly
 
 | Part | State |
 |---|---|
-| The rating engine, lifecycle, validation, stats | **Done.** 172 tests pass. |
+| The rating engine, lifecycle, validation, stats, flags, recap | **Done.** 214 tests pass. |
 | The simulation that proves the ratings are meaningful | **Done.** Spearman 0.883. |
-| Database, security, auth, all four Edge Functions | **Done.** Proven by the smoke test. |
-| The data layer the app reads through | **Done.** |
-| The screens you tap on | **Done.** Ladder, feed, log, profiles, sign-in, settings. |
-| The home-screen widget | **Not built yet.** Needs a Mac and the Apple membership. |
-| Admin tools (fix a score, void a game) | **Not built yet.** |
-| The weekly recap push | **Not built yet.** |
-
-So: by the end of Part 8 you will have the **entire backend running and verified**, and
-in Part 9 you will have the real app on your phone — logging games, confirming them,
-and watching the ladder move.
+| Database, security, username sign-in, all six Edge Functions | **Done.** Proven by the smoke test. |
+| The screens | **Done.** Ladder, feed, log (with photo), profiles, settings, admin. |
+| Home-screen install, and the deep links GitHub Pages needs | **Done.** Checked on a local copy of the Pages setup. |
+| Web Push notifications | **Built and checked as far as a PC can.** Real delivery needs the live site and a phone; see Part 13. |
+| The home-screen widget | **Dropped** on 2026-11-24, with the Apple membership. |
 
 Two commands tell you where you stand at any moment:
 
 ```powershell
-npm test          # 172 passed   <- the rules are correct
+npm test          # 214 passed   <- the rules are correct
 npm run typecheck # silent       <- the code is consistent
 ```
 
@@ -79,7 +82,7 @@ Both are green right now.
 
 ---
 
-## Part 1 — Install the five tools you need
+## Part 1 — Install the tools you need
 
 Do these in order. After each one, run the check command. If the check prints a version
 number, move on. If it prints "not recognized", the install did not finish — close and
@@ -96,7 +99,7 @@ Get the **LTS** installer from <https://nodejs.org>. Accept the defaults.
 node --version
 ```
 
-You should see `v20.x` or newer. **You already have `v26.7.0`, so you are done here.**
+You should see `v22.18` or newer. **You already have `v26.7.0`, so you are done here.**
 
 > Why the version matters: `npm run smoke` runs a TypeScript file *directly*
 > (`node scripts/smoke.ts`) with no build step. Node only learned to do that in v22.18.
@@ -119,7 +122,7 @@ Supabase assume it.
 This is the big one, and the one people get stuck on.
 
 Supabase's backend is not a single program. It is Postgres, a REST layer, an auth
-server, a Deno runtime, a mail catcher and a web UI — about eight programs that have to
+server, file storage, a Deno runtime and a web UI — about eight programs that have to
 agree on versions and networking. Docker runs all of them in isolated containers so you
 never install any of them yourself.
 
@@ -142,27 +145,18 @@ error during connect: ... dockerDesktopLinuxEngine: The system cannot find the f
 ```
 
 then Docker Desktop is installed but **not started**. Open it from the Start menu and
-wait for the whale to stop animating. (This is the exact error the project is giving
-right now.)
+wait for the whale to stop animating.
 
 > Docker needs roughly 4 GB of RAM to run this stack comfortably. If your PC gets
 > sluggish, open Docker Desktop → Settings → Resources and give it a sensible limit.
 
-### 1.4 Xcode — only when you want to run on an iPhone simulator
+### 1.4 A browser, and your phone
 
-This is an **iOS-only** app. Simulators are macOS-only: Xcode does not exist for
-Windows.
+The app is a website, so a browser on your PC is enough to develop it. Chrome or Edge
+are fine.
 
-On Windows your options are:
-
-- **Expo Go on a real iPhone** — a free app from the App Store. Scan a QR code from
-  your terminal and the app loads on your phone. This is what you will use. It covers
-  everything except the widget and native Google/Apple sign-in, which need a real
-  build.
-- **A Mac**, when you reach the widget and TestFlight steps. Unavoidable eventually:
-  Apple does not allow iOS builds from Windows.
-
-For now, install **Expo Go** from the App Store on your iPhone.
+To try it on your **iPhone** while developing, you only need the phone on the same
+Wi-Fi as your PC (Part 9.2). No Mac, no Xcode, no App Store, no Apple account.
 
 ### 1.5 A code editor
 
@@ -191,10 +185,15 @@ The libraries that matter:
 | `openskill` | The actual rating maths. The engine everything else serves. |
 | `@supabase/supabase-js` | How the app talks to the backend. |
 | `expo`, `react-native`, `react` | The app framework. |
+| `react-native-web`, `react-dom` | Turn those React Native screens into a web page. |
 | `@tanstack/react-query` | Caches server data in the app and knows when to refetch. |
 | `vitest` | The test runner. |
 | `supabase` | The command-line tool that runs the local backend. |
 | `typescript` | Checks your types. |
+
+The Edge Functions have one library of their own, `web-push`, listed in
+`supabase/functions/deno.json`. It signs and encrypts notifications. You do not install
+it: the Supabase runtime fetches it.
 
 > **If `npm install` fails** with a permissions or path-length error, the usual cause is
 > OneDrive syncing the folder. This project lives in `Desktop`, which OneDrive often
@@ -213,22 +212,28 @@ npm test
 ```
 
 **What this does.** Runs every `*.test.ts` file under `src/`. These tests cover the
-rating engine, the game lifecycle, score validation, the stats, and the simulation.
+rating engine, the game lifecycle, score validation, the stats, what the admin gets
+flagged, the weekly recap, who passed whom on the ladder, and the simulation.
 
-**What you should see** (this is the real output, right now):
+**What you should see:**
 
 ```
  ✓ src/domain/rating-scale.test.ts (23 tests)
  ✓ src/domain/game-lifecycle.test.ts (34 tests)
- ✓ src/domain/validation.test.ts (60 tests)
- ✓ src/domain/purity.test.ts (5 tests)
+ ✓ src/domain/validation.test.ts (79 tests)
+ ✓ src/domain/purity.test.ts (6 tests)
  ✓ src/domain/stats.test.ts (14 tests)
  ✓ src/domain/rating-preview.test.ts (7 tests)
  ✓ src/domain/rating.test.ts (19 tests)
+ ✓ src/domain/flags.test.ts (6 tests)
+ ✓ src/domain/recap.test.ts (4 tests)
+ ✓ src/domain/overtaken.test.ts (6 tests)
+ ✓ src/domain/types.test.ts (2 tests)
+ ✓ src/ui/standing.test.ts (4 tests)
  ✓ src/simulation/recovery.test.ts (10 tests)
 
- Test Files  8 passed (8)
-      Tests  172 passed (172)
+ Test Files  13 passed (13)
+      Tests  214 passed (214)
 ```
 
 **If you see that, the brain of the application works.** The rating model, the
@@ -280,54 +285,43 @@ npm run typecheck
 This compiles every TypeScript file without producing output, purely to find type
 errors. **Success is silence** — no output at all means no errors.
 
-It passes right now. If it ever starts reporting
-`could not find the relation between games and game_confirmations`, that is the stale
-generated-types problem: run `npm run types:db` (Part 6) and it goes away.
-
 ---
 
 ## Part 4 — Start the backend
 
 From here on, **Docker Desktop must be running.** Check the whale icon.
 
-### 4.1 Create the secrets file the backend reads
+### 4.1 Make the notification keys
 
-The backend's configuration lives in `supabase/config.toml`, which is committed to git.
-Anything secret is *not* in that file — it reads values like `env(RESEND_SMTP_PASSWORD)`
-from a separate file you create yourself and never commit.
+Notifications are signed with a key pair called a **VAPID** key. You make one pair, once,
+and keep it for good: if you ever change it, every phone stops getting notifications
+until its owner switches them on again.
+
+The Edge Functions read their keys from `supabase/functions/.env`, which you create and
+**never commit** (git already ignores it).
 
 ```powershell
-Copy-Item supabase\.env.example supabase\.env
+Copy-Item supabase\functions\.env.example supabase\functions\.env
 ```
 
-Git Bash: `cp supabase/.env.example supabase/.env`
+Git Bash: `cp supabase/functions/.env.example supabase/functions/.env`
 
-**You do not need to edit it.** The placeholders are deliberately fine for local work,
-because email confirmations are switched off locally and only a password reset sends any
-mail at all.
+Now generate a pair. This prints two lines:
 
-What is in it, and what each line is for when you eventually go live:
+```powershell
+node -e "const e=require('crypto').createECDH('prime256v1');e.generateKeys();console.log('VAPID_PUBLIC_KEY='+e.getPublicKey('base64url'));console.log('VAPID_PRIVATE_KEY='+e.getPrivateKey('base64url'))"
+```
 
-| Variable | What it is |
-|---|---|
-| `RESEND_SMTP_PASSWORD` | A Resend API key. Resend is the mail service that actually delivers password resets. The SMTP *username* is literally the word `resend`. |
-| `AUTH_SENDER_EMAIL` | The "from" address on those emails. Must be on a domain you have verified with Resend. |
-| `SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID` | Your iOS bundle identifier, `com.pvqh.badmintonladder`. |
-| `SUPABASE_AUTH_EXTERNAL_APPLE_SECRET` | A generated JWT. Only the *web* sign-in flow needs it. |
-| `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` | Every OAuth client that may present an identity token — your iOS client *and* your web client, comma-separated. |
-| `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` | The Google OAuth client secret. |
+Paste both lines into `supabase/functions/.env`, replacing the placeholders, and set
+`VAPID_SUBJECT` to `mailto:` followed by your own address. Push services use that
+address only to contact you if your server misbehaves.
 
-> **If `supabase\.env.example` does not exist**, that is bug #2 in Part 11 — the file is
-> on disk but git is ignoring it, so a fresh clone has no copy. Part 11.2 fixes it. In
-> the meantime just create `supabase\.env` by hand with these six lines:
-> ```
-> RESEND_SMTP_PASSWORD=re_placeholder
-> AUTH_SENDER_EMAIL=ladder@example.com
-> SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID=com.example.badmintonladder
-> SUPABASE_AUTH_EXTERNAL_APPLE_SECRET=placeholder
-> SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=placeholder.apps.googleusercontent.com
-> SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=placeholder
-> ```
+**Keep the public key handy** — the app needs it too, in Part 5. The private key goes
+nowhere else.
+
+> **The local stack and the live one can share a pair or have their own.** Your own
+> local `supabase/functions/.env` already has a pair made for development. For going
+> live (Part 12), make a fresh pair the same way.
 
 ### 4.2 Start everything
 
@@ -336,34 +330,21 @@ npx supabase start
 ```
 
 **What this does.** Downloads (the first time) and starts about eight Docker containers,
-then applies all seven migration files in `supabase/migrations/` in filename order,
-building the whole schema from nothing.
+then applies every migration file in `supabase/migrations/` in filename order, building
+the whole schema from nothing.
 
 **The first run takes 5–15 minutes** — it is pulling several gigabytes of container
 images. Later runs take 20–30 seconds. Let it finish; interrupting it halfway leaves
 containers in a confused state.
 
-When it finishes it prints a block like this. **Keep this output.**
-
-```
-         API URL: http://127.0.0.1:54321
-     GraphQL URL: http://127.0.0.1:54321/graphql/v1
-          DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-      Studio URL: http://127.0.0.1:54323
-    Inbucket URL: http://127.0.0.1:54324
-      JWT secret: super-secret-...
-        anon key: eyJhbGciOi....VERY.LONG.STRING
-service_role key: eyJhbGciOi....ANOTHER.LONG.STRING
-```
-
-What each one is:
+When it finishes it prints a block of URLs and keys. **Keep this output.** What each one
+is:
 
 | Thing | What it is for |
 |---|---|
 | **API URL** (54321) | The single door into the backend. The app talks only to this. |
 | **DB URL** (54322) | Raw Postgres. For a SQL client like DBeaver or `psql`. |
 | **Studio URL** (54323) | A web UI to browse tables and run SQL. Open it in your browser. |
-| **Inbucket/Mailpit** (54324) | Catches every email the backend "sends" so you can read it in a browser instead of a real inbox. |
 | **anon key** | The public key the app ships with. **Safe to put in the app.** It grants nothing on its own; row-level security decides what a signed-in member may see. |
 | **service_role key** | The master key. Bypasses all security. **Never put this in the app, in `.env`, or in git.** Only Edge Functions and the scheduler hold it. |
 
@@ -372,6 +353,9 @@ You can reprint this any time:
 ```powershell
 npx supabase status
 ```
+
+> If you change `supabase/functions/.env` while the stack is running, run
+> `npx supabase stop` and `npx supabase start` so the functions see it.
 
 ### 4.3 Useful: stop and reset
 
@@ -391,7 +375,7 @@ that has already been applied does nothing until you reset.
 
 ## Part 5 — Tell the app where the backend is
 
-The app needs two values: the URL and the anon key.
+The app needs three values: the backend URL, the anon key, and the VAPID public key.
 
 ```powershell
 Copy-Item .env.example .env
@@ -399,31 +383,30 @@ Copy-Item .env.example .env
 
 Git Bash: `cp .env.example .env`
 
-Now open `.env` and paste in the **anon key** from the `supabase start` output:
+Now open `.env` and fill it in:
 
 ```
 EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi....paste.the.whole.thing.here
+EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi....paste.the.whole.anon.key.here
+EXPO_PUBLIC_VAPID_PUBLIC_KEY=the.public.key.from.part.4.1
 ```
 
 **Why the `EXPO_PUBLIC_` prefix matters.** Expo takes any variable starting with
-`EXPO_PUBLIC_` and bakes its value **literally into the app bundle** at build time.
-That means two things:
+`EXPO_PUBLIC_` and bakes its value **literally into the app's JavaScript** at build
+time. That means two things:
 
-1. Anyone with the app can read it. So **only the anon key may ever go here.** The
-   service role key in this file would hand your entire database to anyone who
-   downloads the app.
+1. Anyone who opens the site can read it. So **only public values may ever go here**:
+   the anon key and the VAPID *public* key. The service role key or the VAPID private
+   key in this file would be published to the world.
 2. Because it is literal text substitution, `src/data/client.ts` spells the names out in
    full rather than looking them up dynamically. A dynamic lookup would be `undefined`
-   in a real build while passing every test on your PC — a bug that only appears on a
-   phone.
+   in a real build while passing every test on your PC.
 
-> **Important for running on a real iPhone:** `127.0.0.1` means "this device". Your
-> phone is not your PC, so it cannot reach `127.0.0.1:54321`. When you test on a real
-> phone, replace it with your PC's LAN address — find it with `ipconfig` and look for
-> `IPv4 Address` (something like `192.168.1.42`), giving
-> `EXPO_PUBLIC_SUPABASE_URL=http://192.168.1.42:54321`. Both devices must be on the same
-> Wi-Fi.
+> **For trying it on your phone (Part 9.2):** `127.0.0.1` means "this device". Your
+> phone is not your PC, so it cannot reach `127.0.0.1:54321`. Replace it with your PC's
+> LAN address — find it with `ipconfig` and look for `IPv4 Address` (something like
+> `192.168.1.42`), giving `EXPO_PUBLIC_SUPABASE_URL=http://192.168.1.42:54321`. Both
+> devices must be on the same Wi-Fi.
 
 ---
 
@@ -442,39 +425,8 @@ too, so a stale copy is a genuine bug, not a cosmetic one.
 
 > **Never edit `src/data/database.types.ts` by hand.** It is generated. A hand edit is
 > silently thrown away the next time you run this command — and worse, it can make the
-> compiler agree to a query the database will refuse at runtime.
->
-> **One exception is currently live and deliberate.** The Decision Log records that the
-> committed copy was stale: it lacked the `game_confirmations.game_id -> games`
-> relationship, which the games migration declares and which the feed query embeds
-> through, so the feed's confirmations typed as a `SelectQueryError`. It was patched by
-> hand to match the migration, with the note that the patch disappears the first time
-> this command is run with Docker available.
->
-> **So the moment you reach this step, that debt clears itself** — run the command and
-> check the diff:
->
-> ```powershell
-> npm run types:db
-> git diff src/data/database.types.ts
-> ```
->
-> If the relationship is still missing after regenerating, the generator is dropping
-> the redundant foreign key and the fix belongs in the *query* rather than the types.
-> In `src/data/games.ts`, name the key explicitly inside `FEED_SHAPE`:
->
-> ```
-> game_confirmations!game_confirmations_game_id_fkey (profile_id, state, responded_at),
-> ```
->
-> You can confirm which case you are in from Studio's SQL Editor — you should see
-> **two** foreign keys:
->
-> ```sql
-> select conname, pg_get_constraintdef(oid)
-> from pg_constraint
-> where conrelid = 'public.game_confirmations'::regclass and contype = 'f';
-> ```
+> compiler agree to a query the database will refuse at runtime. (The hand patch an
+> earlier version of this manual warned about is gone; the committed copy is generated.)
 
 ---
 
@@ -491,18 +443,23 @@ npm run smoke
 3. Checks the game arrived as nine rows with only the logger pre-confirmed.
 4. Checks a player who was *not* in the game **cannot** answer for it.
 5. Checks a club member **cannot** make the server rebuild the ladder on demand.
-6. Has the other three confirm.
-7. Checks the game flipped to `confirmed` and the winning side was derived from scores.
-8. Checks a phone **cannot** write a rating, invent a game, or make itself an admin.
-9. Checks the ratings actually moved — and that the underdogs gained a *lot*.
+6. Has the other three confirm, and checks the game flipped to `confirmed`.
+7. Checks a browser **cannot** write a rating, invent a game, or make itself an admin.
+8. Checks the ratings actually moved — and that the underdogs gained a *lot*.
+9. Makes one member an admin, **corrects the score**, and checks the correction
+   replayed by itself and that an impossible score is refused.
+10. Has the admin **set a temporary password** and signs in with it.
+11. Has the admin **merge a duplicate account**, and checks the duplicate can no
+    longer sign in (and that two players from the same game are refused).
+12. Checks an account made with a real email address **cannot** become a member.
 
 **Expected output:** a list of `ok` lines, ending with
 
 ```
-24 checks passed
+38 checks passed
 ```
 
-Its job is to prove the **wiring**, not the rules — the rules are proven by the 172
+Its job is to prove the **wiring**, not the rules — the rules are proven by the 214
 tests in Part 3. What only this can prove is the stuff that is *configuration* rather
 than code, and would therefore break silently: row-level security, the permission
 grants, the atomic nine-row write, and whether a Deno Edge Function can reach the
@@ -522,9 +479,9 @@ Click **Table Editor** in the left sidebar. The tables, in the order worth readi
 
 - `profiles` — one row per club member. Username, display name, gender, seed tier,
   admin flag. *Having a row here is what makes an account a club member.*
-- `games` — one row per badminton game. Scores, format, status, and two timestamps:
-  `played_at` (what the replay orders by) and `created_at` (what the 24-hour
-  confirmation clock runs from).
+- `games` — one row per badminton game. Scores, format, status, an optional photo, and
+  two timestamps: `played_at` (what the replay orders by) and `created_at` (what the
+  24-hour confirmation clock runs from).
 - `game_participants` — exactly four rows per game: who played, on which side.
 - `game_confirmations` — exactly four rows per game: who has confirmed, disputed, or
   not answered yet.
@@ -537,6 +494,14 @@ Click **Table Editor** in the left sidebar. The tables, in the order worth readi
 - `rating_replay_state` — one row, saying when the ladder was last rebuilt and from how
   many games. **If this looks stale, the ladder on screen does not match the games
   underneath it.**
+
+**The private ones:**
+
+- `push_subscriptions` — one row per phone that turned notifications on. Only its owner
+  can read it.
+- `notification_preferences` — each member's four switches.
+
+Photos live under **Storage → game-photos**, one folder per member.
 
 Now click **SQL Editor** and try this — it is the single most useful query for
 understanding the system:
@@ -557,78 +522,94 @@ And this shows you the derivation is honest:
 select * from rating_replay_state;
 ```
 
-### 8.1 Reading the emails the backend sends
-
-Open <http://127.0.0.1:54324>. This is Mailpit, a fake inbox. Any password-reset email
-lands here instead of a real address.
-
-One catch: `supabase/config.toml` has `[auth.email.smtp] enabled = true`, which points
-mail at Resend rather than Mailpit. To read mail locally, set that `enabled = false`,
-then `npx supabase stop` and `npx supabase start`. Set it back when you are done.
-
 ---
 
 ## Part 9 — Run the app
 
 ```powershell
-npm start
+npm run web
 ```
 
-A QR code appears in the terminal.
+The bundler starts and opens <http://localhost:8081> in your browser. Save a file and
+the page reloads.
 
-- **On an iPhone:** open the Camera app, point it at the QR code, tap the banner. Expo
-  Go opens and loads the app. (Your phone and PC must be on the same Wi-Fi, and see the
-  LAN-address note in Part 5.)
-- **Press `w`** in the terminal to open it in a browser instead — quick for checking the
-  bundler works, though this is an iOS app and not everything will render.
-
-**What you will see:** the sign-in screen. The app is dark-only by design.
+**What you will see:** the sign-in screen. The app is dark-only by design. Shrink the
+browser window to phone width; that is the size it is built for.
 
 ### 9.1 Walk the whole loop yourself
 
 This is the real test, and it takes about three minutes. You need **two** accounts at
 minimum, four to see a rating actually move.
 
-1. **Sign up.** Tap through to *Join the club*. A username alone is enough — no email
-   needed. Pick a display name and declare your level (Newbie, Y, TB, TB+, Khá).
-   Remember: the seed only sets your *starting* point; a few games will overrule it.
-2. **You land on `create-profile`** if the account exists but the membership does not.
-   That gap is a real state, not an error — it is how Google and Apple sign-in work too.
-3. **The Ladder tab** will say *"Nobody has played yet. Log a game and the ladder
-   starts."*
-4. **Repeat 1–2 three more times** in Expo Go (sign out from Settings), or just run
-   `npm run smoke` to have four members created for you.
-5. **Log tab.** You hold the first slot automatically — the server only accepts a game
+1. **Sign up.** Tap *Join the club*. A username and a password are all it asks for.
+   Then pick a display name, which list you appear on, and your level (Newbie, Y, TB,
+   TB+, Khá). The level only sets your *starting* point; a few games overrule it.
+2. **You land on the Ladder tab.** Every route from the home-screen icon lands there.
+3. **Make more players.** Sign out from Settings and repeat, or run `npm run smoke` to
+   have four members created for you.
+4. **Log tab.** You hold the first slot automatically — the server only accepts a game
    you played in. Pick a partner and two opponents, choose *to 21*, type a score.
-   - Type `21` and `25` and watch it refuse: *"That is not a finished game to 21: win
-     by two, and a cap at the top."* That is `src/domain/validation` running on your
-     phone, the same function the 60 validation tests exercise.
-   - Enter a legal score and the **"What it is worth"** card appears, showing what each
-     of the four stands to gain or lose. It is captioned as an estimate on purpose: the
-     real number is computed on the server once all four agree.
-6. **Submit.** The other three now have 24 hours. Your lineup stays put so the next
+   - Type `21` and `25` and watch it refuse. That is `src/domain/validation` running in
+     the browser, the same function the 79 validation tests exercise.
+   - Enter a legal score and each player's stake appears: what they stand to gain or
+     lose. It is an estimate on purpose: the real number is computed on the server once
+     all four agree.
+   - *Add a photo* is optional. The photo is shrunk in the browser before it uploads.
+   - In the player picker, *Invite someone new* shares (or copies) the sign-up link.
+5. **Submit.** The other three now have 24 hours. Your lineup stays put so the next
    game is just a score.
-7. **Sign in as one of the others.** A banner on opening the app says you owe an
-   answer. Confirm it. Then the last one.
-8. **The moment the fourth person confirms**, the server replays the entire game
-   history and the Ladder tab changes. The header will tell you *"Ratings last rebuilt
-   just now."*
-9. **The Feed tab** shows the game with the rating change against each name. **Me**
+6. **Sign in as one of the others.** A banner says you owe an answer. Confirm it. Then
+   the last one.
+7. **The moment the fourth person confirms**, the server replays the entire game
+   history and the Ladder tab changes.
+8. **The Feed tab** shows the game with the rating change against each name. **Me**
    shows your record, your rating graph, your partner breakdown and your
    performance-vs-expectation.
 
 If that loop works, the application works.
 
+**To try the admin screens**, make yourself an admin in Studio's SQL Editor:
+
+```sql
+update public.profiles set is_admin = true where username = '<your username>';
+```
+
+Reload the page. Settings now has a link to **club admin**: flagged games (disputed, or
+accepted by the clock with nobody but the logger vouching for them) and every member.
+Open a game as an admin to correct its score, resolve a dispute, or remove it. Open a
+member to change their seed tier, make them an admin, set a temporary password, or
+merge a duplicate account into the one they keep.
+
 Press `Ctrl+C` to stop the bundler.
 
-### 9.2 What you cannot test in Expo Go
+### 9.2 On your iPhone, while developing
 
-- **Push notifications.** They need a real build with push credentials. In Expo Go the
-  confirmation request will not arrive as a notification — use the in-app banner
-  instead, which is exactly why the banner exists (story 28).
-- **Native Google and Apple sign-in.** Both need a real build and configured OAuth
-  clients. Username and email sign-in work fully.
-- **The widget.** Not built, and needs a Mac.
+1. Use your PC's LAN address in `.env` (the note at the end of Part 5), then restart
+   `npm run web`.
+2. On the iPhone, open Safari and go to `http://<your PC's LAN address>:8081`.
+3. Windows Firewall may ask to let Node through on first run. Allow it on private
+   networks.
+
+Everything works this way **except notifications**: browsers only allow them on
+`https://` sites (and `localhost`), and your PC serves plain `http://`. Try notifications
+on the live site (Part 13) instead.
+
+### 9.3 Check the real build before you push
+
+`npm run web` is the development server. What GitHub Pages serves is a different thing,
+a static export:
+
+```powershell
+npm run export:web
+```
+
+That writes `dist/`, including a copy of `index.html` named `404.html`. **Why the copy:**
+GitHub Pages has no way to send every address to the app, so a link like
+`/BadmiGo/game/abc` would be a 404. Pages serves `404.html` for any missing file, and
+since that is the app, the app opens and shows the game.
+
+The export expects to live at `/BadmiGo/`, not at the root, so opening
+`dist/index.html` straight from disk shows a blank page. That is expected.
 
 ---
 
@@ -638,7 +619,7 @@ Pin this section.
 
 ```powershell
 # ----- no Docker needed -----
-npm test                  # the 172 domain tests. Run constantly.
+npm test                  # the 211 domain tests. Run constantly.
 npm run test:watch        # re-run on every save. Leave this open while coding.
 npm run simulate          # the 30-player simulation, with its report table
 npm run typecheck         # find type errors across the project
@@ -652,8 +633,8 @@ npm run types:db          # regenerate database.types.ts — do this after every
 npm run smoke             # the end-to-end check
 
 # ----- the app -----
-npm start                 # Expo bundler + QR code
-npm run ios               # same, aimed at an iOS simulator (needs a Mac)
+npm run web               # development server at http://localhost:8081
+npm run export:web        # the static site GitHub Pages serves, into dist/
 ```
 
 ### The order you will actually work in
@@ -669,196 +650,165 @@ npm run ios               # same, aimed at an iOS simulator (needs a Mac)
 **Changing the database:**
 
 1. Create a **new** migration file in `supabase/migrations/`. Name it with a timestamp
-   after the existing ones, e.g. `20261105090000_admin_tools.sql`. **Never edit a
-   migration that has already run on production** — it will not re-run.
+   after the existing ones. **Never edit a migration that has already run on
+   production** — it will not re-run.
 2. `npx supabase db reset` — wipe and re-apply everything, including yours.
 3. `npm run types:db` — regenerate the types.
 4. `npm run smoke` — confirm nothing broke.
+5. When it is live: `npx supabase db push` (Part 12).
 
-**Changing a screen:** `npm start`, save a file, it reloads on the phone.
+**Changing a screen:** `npm run web`, save a file, it reloads. When you are happy,
+commit and push to `main`; GitHub builds and publishes it (Part 11).
 
----
-
-## Part 11 — Two things to fix, and they are both one line
-
-These came out of a strict code-quality review on 2026-11-04. Two of the four original
-findings were fixed by the author while the review was running — `probe.ts` is gone and
-`typecheck` is clean, and the dependency justifications are now in the Decision Log.
-These two remain, they are both in `.gitignore`, and together they take under a minute.
-
-### 11.1 Put the specification back in version control — do this first
-
-**The problem.** The last line of `.gitignore` is `*.md`, which means git is ignoring
-**every** markdown file in the project. Check for yourself:
-
-```powershell
-git ls-files | Select-String "\.md$"
-```
-
-That returns nothing. **Zero** markdown files are tracked, out of 44 tracked files.
-`CLAUDE.md`, `docs/SPEC.md`, `docs/BACKEND.md`, `architecture.md` and this file are all
-invisible to git.
-
-**Why it matters more than it looks.** `CLAUDE.md` opens with *"Read this file and
-`docs/SPEC.md` before writing any code. They are the contract."* It holds the five hard
-rules and the append-only Decision Log — the record of which numbers were measured,
-which designs were rejected, and why. None of it is reconstructible from the code. One
-`git clean -xfd`, one disk failure, one accidental folder delete, and the entire design
-history is gone while every line of code survives.
-
-**The fix.** Open `.gitignore` and delete the last two lines:
-
-```
-# Docs
-*.md
-```
-
-Then commit the documents:
-
-```powershell
-git add -A
-git commit -m "Track the spec, the hard rules and the decision log"
-```
-
-### 11.2 Stop ignoring the two example env files
-
-**The problem.** Line 46 of `.gitignore` is `.env.example` **with a trailing space**.
-Git strips trailing whitespace from ignore patterns, so that line matches
-`.env.example` — the exact files it was written to *spare*. Both `.env.example` and
-`supabase/.env.example` are therefore untracked.
-
-```powershell
-git check-ignore -v .env.example supabase/.env.example
-```
-
-**Why it matters.** Those two files are the only documentation of which environment
-variables exist. On a clean clone they are absent, so the first two commands of local
-setup — `cp .env.example .env` — fail with "no such file", and a newcomer has no way to
-know what belongs in `.env`.
-
-**The fix.** Replace those lines in `.gitignore` with an explicit pair:
-
-```
-# Filled-in environment files. Only the .example copies are committed.
-.env
-supabase/.env
-!.env.example
-!supabase/.env.example
-```
-
-Then `git add .env.example supabase/.env.example` and commit.
-
-### 11.3 Verify
-
-```powershell
-npm test            # 172 passed
-npm run typecheck   # silent = success
-npm run smoke       # 24 checks passed      (needs the stack running)
-git status           # and the .md files are now tracked
-```
-
-### 11.4 One thing to remember rather than fix
-
-`src/data/database.types.ts` holds a deliberate hand patch, recorded in the Decision
-Log: the committed copy was generated before the `game_confirmations -> games` foreign
-key existed in the local database, so it was patched by hand to match the migration.
-
-**It clears itself the first time you run `npm run types:db` with Docker running** —
-which is Part 6. The only risk is forgetting, so do Part 6 before you trust the feed.
+**Changing an Edge Function:** the local stack picks up a saved file on the next
+request. When it is live: `npx supabase functions deploy` (Part 12).
 
 ---
 
-## Part 12 — Four deeper problems worth fixing before the club uses this
+## Part 11 — Put the app on GitHub Pages
 
-Not blockers. They will cause confusing bugs later, and they are all small fixes now.
-Full write-ups are in `architecture.md` section 15.
+The repository is `pvqh/BadmiGo` and it is **public**, which is what a free GitHub
+account needs for Pages. That is fine: the repository holds no secrets. The files that
+do (`.env`, `supabase/functions/.env`) are ignored by git. **Never commit them**, and
+never commit the service role key anywhere.
 
-### 12.1 Two queries claim an order they do not have
+`.github/workflows/pages.yml` does the work. On every push to `main` it installs the
+dependencies, runs the typecheck and the tests (so a broken rule never reaches the
+club), runs `npm run export:web`, and publishes `dist/`.
 
-In `src/data/games.ts` and `src/data/ladder.ts`:
+### 11.1 Once: switch Pages on
 
-```ts
-.order('played_at', { referencedTable: 'games', ascending: false })
+1. On GitHub, open the repository → **Settings → Pages**.
+2. Under **Build and deployment → Source**, choose **GitHub Actions**.
+
+### 11.2 Once: give the build the three public values
+
+The build bakes the backend's address into the app, so GitHub needs the **live**
+values (from Part 12, not your local ones).
+
+**Settings → Secrets and variables → Actions → Variables tab → New repository variable**,
+three times:
+
+| Name | Value |
+|---|---|
+| `EXPO_PUBLIC_SUPABASE_URL` | `https://<your-project-ref>.supabase.co` |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | the hosted project's anon key |
+| `EXPO_PUBLIC_VAPID_PUBLIC_KEY` | the public half of your live VAPID pair |
+
+These are **Variables**, not Secrets, on purpose: their values end up in the published
+JavaScript anyway, and calling them secret would only be misleading.
+
+### 11.3 Every time: push
+
+```powershell
+git push
 ```
 
-That option orders rows **inside** an embedded resource. Here `games!inner` is a
-to-*one* embed — there is exactly one game per row — so it sorts a list of one and the
-top-level order is left undefined.
+Watch it under the repository's **Actions** tab. When it is green, the app is at
+**<https://pvqh.github.io/BadmiGo/>**. You can also re-run it by hand from the Actions
+tab (*Run workflow*) — for example after changing a variable.
 
-So `readMyPendingGames` does not actually return newest-first, and `readRatingHistory`
-does not actually return oldest-first. **The second one matters: it is the rating
-graph, and the points will be in arbitrary order.**
+> **If you rename the repository**, the address changes with it, and three places
+> carry the old name: `experiments.baseUrl` in `app.json`, the `/BadmiGo/` paths in
+> `public/index.html`, and `site_url` in `supabase/config.toml`. Change all three
+> together.
 
-The clean fix also simplifies things. Make `games` the top-level table, joining through
-an *aliased* inner embed so the real participant list stays whole:
+---
 
-```ts
-export async function readMyPendingGames(profileId: ProfileId) {
-  return unwrap(
-    await supabase
-      .from('games')
-      .select(`${FEED_SHAPE}, mine:game_participants!inner (profile_id)`)
-      .eq('mine.profile_id', profileId)
-      .eq('status', 'pending')
-      .order('played_at', { ascending: false }),
-  );
-}
+## Part 12 — Put the backend live
+
+Everything above was local. `docs/BACKEND.md` has the full detail; this is the shape of
+it.
+
+### 12.1 Create the hosted project and push the schema
+
+Make a free project at <https://supabase.com>, then:
+
+```powershell
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push             # apply the migrations to the hosted database
+npx supabase functions deploy    # deploy all six Edge Functions
+npx supabase config push         # push the auth settings, including the site URL
 ```
 
-The alias matters: filtering on an embed also filters the embedded rows, so without a
-separate alias the lineup would shrink to one player. As a bonus this returns a plain
-`GameRow`, the same shape as the feed, which deletes the `{ game_id, games }` wrapper
-the screens would otherwise have to unpack three different ways.
+Then give the functions their keys. Make a **fresh** VAPID pair (Part 4.1's command)
+for the live site, put it in a file outside the repository such as
+`C:\Users\Admin\vapid-live.env`, and run:
 
-For `readRatingHistory`, just sort in the client. It is a few hundred points at most,
-and it is honest.
+```powershell
+npx supabase secrets set --env-file C:\Users\Admin\vapid-live.env
+```
 
-### 12.2 Two replays at the same moment collide
+The public half goes into the GitHub variable `EXPO_PUBLIC_VAPID_PUBLIC_KEY` (Part
+11.2), and the hosted URL and anon key into the other two.
 
-`apply_replay` deletes all of `rating_history` and then inserts. `player_ratings` is
-protected by `on conflict do update`; `rating_history` is not.
+### 12.2 Make yourself the first admin
 
-`confirm-game` fires a replay **every time a game becomes confirmed**. Two people
-confirming two different games in the same second on a Saturday evening is completely
-ordinary. When that happens, both transactions delete the rows their own snapshot can
-see, then both insert the same primary keys — and the second one fails with a unique
-violation. Result: the ladder silently stays stale.
-
-One line fixes it. In `supabase/migrations/...120300_derived_ratings.sql`, make it the
-first statement in the body of `apply_replay`:
+Sign up in the live app, then in the hosted project's **SQL Editor**:
 
 ```sql
-perform pg_advisory_xact_lock(hashtext('apply_replay'));
+update public.profiles set is_admin = true where username = '<your username>';
 ```
 
-Concurrent replays then queue instead of colliding. Remember: new migration file, then
-`db reset`, then `types:db`.
+Every admin after that is appointed in the app: *club admin → a member → Admin*. Appoint
+a second one early (story 72), so corrections do not wait when you are away.
 
-### 12.3 Two silent failures
+### 12.3 Schedule the hourly sweep and the Sunday recap — do not skip this
 
-- **`auto-accept` claims `replayed: true` when it never replayed.** The replay sits
-  behind `if (accepted.length > 0)`, but the final `return` hardcodes `replayed: true`.
-  That is the field you read out of `cron.job_run_details` to check the scheduler is
-  healthy, so it lies on every quiet hour.
-- **`confirm-game` throws the replay error away.** `replayed = replay.error === null`
-  discards it with no log line. For a system whose first rule is "ratings are derived", a
-  silent replay failure is the one fault you most want a breadcrumb for. Add
-  `console.error(replay.error)`.
+`auto-accept` and `weekly-recap` work perfectly and **nothing calls them.** Without a
+scheduler, a game nobody answers stays pending forever (story 26) and nobody gets a
+recap (story 62). They need the project ref and the service role key, so they cannot
+live in a migration.
 
-### 12.4 The purity guard has a hole
+Run the SQL under **"Going live → 3. The schedules"** in `docs/BACKEND.md`, **once**, in
+the SQL Editor of your hosted project. The recap is set for Sunday 13:00 UTC, which is
+20:00 in Vietnam.
 
-`src/domain/purity.test.ts` is the single mechanism enforcing "the domain core imports
-nothing". Its forbidden list matches `'expo'` and `'expo/'` — but the real packages are
-`expo-router`, `expo-constants`, `expo-linking`, `expo-status-bar`. All four would pass.
+Check they are firing:
 
-Match the `expo-` prefix too. While you are there, the spec also promises the domain
-takes *"no dates from the system clock"*. Nothing checks it. The discipline is currently
-perfect, so adding a check for `Date.now(` under `src/domain` costs nothing and keeps it
-that way.
+```sql
+select * from cron.job_run_details order by start_time desc limit 5;
+```
+
+### 12.4 The bill
+
+There is none. GitHub Pages and Supabase's free tier cover a club of thirty. Two things
+to know:
+
+- Supabase free projects pause after about a week of inactivity. Twice-weekly use
+  comfortably prevents it.
+- Storage (game photos) has a 1 GB free limit. Photos are shrunk to well under 512 KB
+  each, so that is thousands of photos.
 
 ---
 
-## Part 13 — When something breaks
+## Part 13 — Bring the club in
+
+Send everyone **<https://pvqh.github.io/BadmiGo/>**. Each player, on their iPhone:
+
+1. Opens the link **in Safari**. (Not inside Zalo's or Messenger's own browser: tap
+   the menu there and choose *Open in Safari*. Only Safari can add it to the home
+   screen.)
+2. Taps the **Share** button, then **Add to Home Screen**, then **Add**. The sign-in
+   screen shows these steps too, whenever the app is open in a Safari tab.
+3. Opens the ladder **from the new icon** and signs up.
+4. In **Settings**, turns on **notifications on this phone** and allows them.
+
+Step 4 only works from the home-screen icon, and needs **iOS 16.4 or later**. A player
+who skips it still sees a banner for games waiting on them, and the 24-hour
+auto-accept keeps the ladder moving either way. A player who owes several answers
+after a session can clear them with **Confirm all** at the top of the Feed.
+
+**Test notifications yourself first**: turn them on, have someone log a game with you
+in it, and check the notification arrives and opens that game. This is the one part
+that cannot be checked on a PC.
+
+**A forgotten password:** they ask an admin. The admin opens *club admin → the member
+→ Temporary password*, sets one, tells them in person, and they change it in Settings.
+
+---
+
+## Part 14 — When something breaks
 
 ### `failed to connect to the docker API ... dockerDesktopLinuxEngine`
 
@@ -877,9 +827,10 @@ again. You lose only local containers; nothing in this repository is at risk.
 
 ### `Error: EXPO_PUBLIC_SUPABASE_URL is missing. Copy .env.example to .env and fill it in.`
 
-Exactly what it says. Go back to Part 5. If `.env` exists and looks right, **restart the
-Expo bundler** — those values are read at bundle time, not at runtime, so an already-
-running bundler will not see your edit.
+Exactly what it says. Go back to Part 5. If `.env` exists and looks right, **restart
+`npm run web`** — those values are read at bundle time, not at runtime, so an
+already-running bundler will not see your edit. On the live site, the same message
+means a GitHub variable is missing (Part 11.2).
 
 ### `supabase status is missing the local keys; is the stack running?`
 
@@ -896,21 +847,41 @@ npm run types:db
 npm run smoke
 ```
 
-### `could not find the relation between games and game_confirmations`
-
-That is bug 11.3. Follow Part 11.3.
-
 ### A query compiles but returns a 400 at runtime
 
 Almost always a stale or hand-edited `database.types.ts`. Run `npm run types:db` and
 look at the diff. If the diff is large, your types were badly out of date and that is
 the real bug.
 
+### The live site is a blank page
+
+Open it on your PC and press `F12` → Console. A red `404` for a `.js` file under
+`/_expo/` means the base path is wrong: the repository was renamed, or `app.json` was
+changed. See the box at the end of Part 11.
+
+### A link to a game opens "Page not found" on the live site
+
+`dist/404.html` is missing. The workflow makes it with `npm run export:web`; if you
+changed that script, put the copy back.
+
+### Settings says "This browser cannot receive notifications"
+
+On an iPhone: the app is open in a Safari tab, not from the home-screen icon, or iOS is
+older than 16.4. On a PC: the page is on plain `http://` other than `localhost`, or
+`EXPO_PUBLIC_VAPID_PUBLIC_KEY` is empty in the build.
+
+### Notifications are on but never arrive
+
+Look at the function logs in the Supabase dashboard (**Edge Functions → notify-players
+→ Logs**). `push failed` with a reason is the push service refusing; a missing
+`VAPID_...` message means `supabase secrets set` was skipped (Part 12.1). If the keys
+were ever changed, every phone has to switch notifications off and on again.
+
 ### The app on my phone cannot reach the backend
 
 `127.0.0.1` means "this device", and your phone is not your PC. Use your PC's LAN IP —
 see the note at the end of Part 5. Both devices on the same Wi-Fi. Windows Firewall may
-also need to allow Node through on first run.
+also need to allow Node and Docker through.
 
 ### Tests pass but the app behaves differently
 
@@ -920,123 +891,26 @@ That narrowing is the entire reason the project is laid out this way.
 
 ---
 
-## Part 14 — When you are ready to go live
+## Part 15 — What comes next
 
-Everything above was local. Going to production is three things the repository cannot
-hold for you. `docs/BACKEND.md` has the full detail; this is the shape of it.
+Everything in the spec is built. What is left is finding out whether it works for the
+club:
 
-### 14.1 Create the hosted project and push the schema
+1. **Do Parts 11–13**, then put it in front of two or three players before the whole
+   club. What you do not know yet is whether logging a game between games is actually
+   fast enough courtside. That answer should shape anything that comes next.
+2. **Check notifications on a real iPhone** (Part 13) before you rely on them.
+3. **Watch `cron.job_run_details`** for the first weekend, to see the sweep and the recap
+   ran.
 
-Make a free project at <https://supabase.com>, then:
+Things to know rather than fix:
 
-```powershell
-npx supabase link --project-ref <your-project-ref>
-npx supabase db push           # apply the migrations to the hosted database
-npx supabase functions deploy  # deploy all four Edge Functions
-npx supabase config push --env-file supabase/.env   # push auth + SMTP settings
-```
-
-For this step `supabase/.env` must hold **real** values: a Resend API key, a sender
-address on a domain verified with Resend, and your Google and Apple client IDs.
-
-Then update `.env` with the hosted project's URL and anon key — **the hosted anon key,
-not the local one.**
-
-### 14.2 Set up Google and Apple sign-in
-
-They ship together. App Store guideline 4.8 requires an equivalent privacy-respecting
-login wherever a third-party one is offered, so offering Google obliges you to offer
-Apple.
-
-The app's URL scheme is `badmintonladder`, already in `app.json` and in
-`additional_redirect_urls`. Google's `client_id` takes **every** client that may present
-an identity token — iOS *and* web, comma-separated. Apple's takes the bundle identifier,
-`com.pvqh.badmintonladder`.
-
-### 14.3 Schedule the hourly sweep — do not skip this
-
-`auto-accept` works perfectly and **nothing calls it.** Without a scheduler, a game
-nobody answers stays pending forever and story 26 does not exist. It needs the project
-ref and the service role key, so it cannot live in a migration.
-
-Run this **once**, in the SQL Editor of your hosted project:
-
-```sql
-select vault.create_secret('https://<ref>.supabase.co/functions/v1', 'functions_url');
-select vault.create_secret('<service-role-key>', 'service_role_key');
-
-select cron.schedule('auto-accept', '7 * * * *', $job$
-  select net.http_post(
-    url := (select decrypted_secret from vault.decrypted_secrets where name = 'functions_url')
-           || '/auto-accept',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' ||
-        (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')),
-    body := '{}'::jsonb
-  );
-$job$);
-```
-
-Check it is firing:
-
-```sql
-select * from cron.job_run_details order by start_time desc limit 5;
-```
-
-### 14.4 Apple, and the one bill
-
-- **Apple Developer Program, $99/year.** Required, and it is the project's only cost.
-  The App Group entitlement the widget needs is not available to free personal teams.
-- **TestFlight only.** Not the public App Store. Build with EAS
-  (`npx eas build -p ios`), submit to TestFlight, invite a handful of players first,
-  then the whole club.
-- **You need a Mac** for the widget and for Xcode. There is no way around this from
-  Windows.
-- Supabase free projects pause after about a week of inactivity — twice-weekly use
-  comfortably prevents it.
-
----
-
-## Part 15 — What to build next
-
-The spec's own build order is: **schema and auth → log, confirm and the rating engine →
-ladder, feed and stats → widget → TestFlight.**
-
-**The first three are done.** The remaining work, in the order that pays off:
-
-1. **Fix the two `.gitignore` lines** (Part 11). The specification and the Decision Log
-   are not in version control. Nothing else on this list matters if that is lost.
-
-2. **Fix the two unordered queries** (Part 12.1). `readRatingHistory` feeds the rating
-   graph, and its points are currently in arbitrary order — the graph on the Me tab is
-   drawing a scribble rather than a trend. This is the one live bug a club member would
-   actually see.
-
-3. **Add the advisory lock to `apply_replay`** (Part 12.2). One line. Without it, two
-   people confirming different games in the same second leaves the ladder silently
-   stale, and Saturday evening is exactly when that happens.
-
-4. **Put the app in front of two or three players** before building anything else. The
-   loop works; what you do not know yet is whether logging a game between games is
-   actually fast enough courtside. That answer should shape what comes next.
-
-5. **Admin tooling** (stories 65–72). All the pieces exist — the reducer has `void` and
-   `resolve`, `persist_game_state` and `replay-ratings` exist, `is_admin()` guards the
-   privileged columns. Until it is built, **an admin edit to `seed_tier` leaves every
-   rating stale** until a replay runs, and `rating_replay_state` is the only way to
-   notice. Story 67 says the recomputation must be automatic, so whatever you build must
-   end in a replay.
-
-6. **The hourly `auto-accept` schedule** (Part 14.3) before any real club use. Without
-   it, a game nobody answers stays pending forever.
-
-7. **The widget.** Needs the $99 Apple membership and a Mac. This is the feature the
-   whole premise rests on — an ambient ladder on the home screen — so it is worth the
-   cost, but everything else should be solid first.
-
-8. **The weekly recap** (story 62). The preference exists and defaults on; nothing
-   sends it.
+- **Two replays finishing in the wrong order.** The advisory lock in `apply_replay`
+  stops two replays from colliding, but if an older replay is slow enough to finish
+  after a newer one, the ladder can be one game behind until the next confirmation
+  replays again. At this club's volume that is rare and fixes itself.
+- **A newly appointed admin** sees the admin screens after reopening the app, because
+  the app reads a member's profile once per session.
 
 Still firmly out of scope, however tempting: pairing and court-rotation suggestions.
 It is the likely v2 and the ratings this app produces are exactly its input — but the
@@ -1050,12 +924,12 @@ These are from `CLAUDE.md`. They are not style preferences; breaking one is a bu
 
 1. **Never write a rating as an authoritative value.** Every rating is the output of a
    full replay. Any code path that changes a rating without a replay is wrong, however
-   small it looks.
+   small it looks. Admin corrections change the *game*, then replay.
 2. **`src/domain/**` imports nothing** from React, React Native, Expo, Supabase, or any
-   I/O library. It is plain functions over plain data. It is the only test seam in the
-   project. Keep it that way.
+   I/O library, and never reads the clock. It is plain functions over plain data. It is
+   the only test seam in the project. Keep it that way.
 3. **Rating maths runs server-side only.** The client may *preview* a prospective
-   change; it never computes an authoritative one. A patched app must not be able to
+   change; it never computes an authoritative one. A patched page must not be able to
    fake a ranking.
 4. **Nothing from the spec's Out of Scope list.** Each item is there for a reason that
    was argued through.

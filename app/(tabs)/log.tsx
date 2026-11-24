@@ -7,6 +7,7 @@ import { validateProposedGame, type ValidationProblem } from '../../src/domain/v
 import { Button } from '../../src/ui/components/button';
 import { CourtSide } from '../../src/ui/components/court-side';
 import { Choice } from '../../src/ui/components/field';
+import { PhotoPicker } from '../../src/ui/components/photo-picker';
 import { PlayerPicker, type Pickable } from '../../src/ui/components/player-picker';
 import { useLogGame, useStrengths } from '../../src/ui/queries';
 import { useMember } from '../../src/ui/session';
@@ -40,6 +41,7 @@ export default function LogGame() {
   const [scoreA, setScoreA] = useState('');
   const [scoreB, setScoreB] = useState('');
   const [picking, setPicking] = useState<Slot | null>(null);
+  const [photo, setPhoto] = useState<Blob | null>(null);
 
   const strengths = useStrengths();
   const logging = useLogGame(me.id);
@@ -84,12 +86,17 @@ export default function LogGame() {
 
   const submit = () => {
     if (proposed === null || !ready) return;
-    logging.mutate(proposed, {
-      onSuccess: () => {
-        setScoreA('');
-        setScoreB('');
+    logging.mutate(
+      { ...proposed, loggerId: me.id, photo },
+      {
+        onSuccess: () => {
+          setScoreA('');
+          setScoreB('');
+          // The lineup carries over to the next game; a photo belongs to this one.
+          setPhoto(null);
+        },
       },
-    });
+    );
   };
 
   return (
@@ -136,6 +143,8 @@ export default function LogGame() {
         {logging.isError ? (
           <Text style={[font.body, { color: colour.down }]}>{logging.error.message}</Text>
         ) : null}
+
+        <PhotoPicker onChange={setPhoto} photo={photo} />
 
         <Button busy={logging.isPending} disabled={!ready} label="Log game" onPress={submit} />
 

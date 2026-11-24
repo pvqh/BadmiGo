@@ -1,4 +1,5 @@
 import type { GameRow } from '../data/games';
+import type { ReviewedGame } from '../domain/flags';
 import { AUTO_ACCEPT_MS } from '../domain/game-lifecycle';
 import type { RatedGame } from '../domain/rating';
 import type { ProfileId, Side } from '../domain/types';
@@ -76,5 +77,18 @@ export function toRatedGame(row: GameRow): RatedGame | null {
     sideB: [b[0].profileId, b[1].profileId],
     scoreA: row.score_a,
     scoreB: row.score_b,
+  };
+}
+
+/** The row as src/domain/flags reads it, to decide whether an admin should look. */
+export function toReviewedGame(row: GameRow): ReviewedGame {
+  return {
+    status: row.status,
+    logger: row.logger_id,
+    loggedAt: new Date(row.created_at).getTime(),
+    answers: row.game_confirmations.map((answer) => ({
+      profileId: answer.profile_id,
+      respondedAt: answer.responded_at === null ? null : new Date(answer.responded_at).getTime(),
+    })),
   };
 }

@@ -131,20 +131,20 @@ isOneToOne: true
                   Relationships: [
                     
                   ]
-                },"push_tokens": {
+                },"push_subscriptions": {
                   Row: {
-                    "profile_id": string,"token": string,"updated_at": string
+                    "auth": string,"endpoint": string,"p256dh": string,"profile_id": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "profile_id": string,"token": string,"updated_at"?: string
+                    "auth": string,"endpoint": string,"p256dh": string,"profile_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "profile_id"?: string,"token"?: string,"updated_at"?: string
+                    "auth"?: string,"endpoint"?: string,"p256dh"?: string,"profile_id"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
-      foreignKeyName: "push_tokens_profile_id_fkey"
+      foreignKeyName: "push_subscriptions_profile_id_fkey"
       columns: ["profile_id"]
 isOneToOne: false
       referencedRelation: "profiles"
@@ -198,10 +198,26 @@ isOneToOne: false
           }
           Functions: {
             "apply_replay":
-{ Args: { "p_duration_ms": number,"p_history": Json,"p_ratings": Json }; Returns: undefined
-                           },
+{ Args: { "p_duration_ms": number,"p_history": Json,"p_ratings": Json }; Returns: {
+              "display_rating": number,
+"games_played": number,
+"in_placement": boolean,
+"is_active": boolean,
+"last_played_at": string | null,
+"mu": number,
+"profile_id": string,
+"sigma": number,
+"tier": Database["public"]['Enums']["tier"],
+"updated_at": string
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "player_ratings"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
 "create_my_profile":
-{ Args: { "p_display_name": string,"p_gender": Database["public"]['Enums']["gender"],"p_seed_tier": Database["public"]['Enums']["tier"],"p_username": string }; Returns: {
+{ Args: { "p_display_name": string,"p_gender": Database["public"]['Enums']["gender"],"p_seed_tier": Database["public"]['Enums']["tier"] }; Returns: {
               "created_at": string,
 "display_name": string,
 "gender": Database["public"]['Enums']["gender"],
@@ -230,6 +246,9 @@ isOneToOne: false
                            },
 "log_game":
 { Args: { "p_format": number,"p_photo_path"?: string,"p_score_a": number,"p_score_b": number,"p_side_a": (string)[],"p_side_b": (string)[] }; Returns: string
+                           },
+"merge_profiles":
+{ Args: { "p_keep": string,"p_merge": string }; Returns: undefined
                            },
 "persist_game_state":
 { Args: { "p_confirmations": Json,"p_expected_confirmations": Json,"p_expected_status": Database["public"]['Enums']["game_status"],"p_game_id": string,"p_status": Database["public"]['Enums']["game_status"],"p_void_reason"?: string }; Returns: undefined

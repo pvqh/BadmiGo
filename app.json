@@ -8,11 +8,14 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "platforms": [
-      "ios"
+      "web"
     ],
-    "ios": {
-      "bundleIdentifier": "com.pvqh.badmintonladder",
-      "supportsTablet": false
+    "web": {
+      "output": "single",
+      "favicon": "./assets/icon.png"
+    },
+    "experiments": {
+      "baseUrl": "/BadmiGo"
     },
     "plugins": [
       "expo-router"

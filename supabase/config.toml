@@ -157,11 +157,11 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "badmintonladder://"
+site_url = "https://pvqh.github.io/BadmiGo/"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["badmintonladder://", "badmintonladder://auth-callback", "exp://127.0.0.1:8081"]
+additional_redirect_urls = ["http://localhost:8081"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -197,9 +197,7 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-# Thirty members who might each need a password reset in the same evening; the
-# default of two would turn story 5 into "ask the admin" for everyone after the first.
-email_sent = 30
+email_sent = 2
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -237,23 +235,8 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Resend, from day one. Supabase's built-in mailer is rate-limited to a trickle and
-# a password reset that silently never arrives is how a community quietly stops
-# using an app. Enabled here rather than in the dashboard so the setting is reviewed
-# in git and cannot be forgotten on a project rebuild.
-#
-# Local development: only password resets send mail at all, because email
-# confirmations are off, so a placeholder RESEND_SMTP_PASSWORD is enough to start.
-# To read a reset email locally, set enabled = false and use Mailpit on :54324.
-[auth.email.smtp]
-enabled = true
-host = "smtp.resend.com"
-port = 587
-user = "resend"
-pass = "env(RESEND_SMTP_PASSWORD)"
-admin_email = "env(AUTH_SENDER_EMAIL)"
-sender_name = "Badminton Ladder"
-
+# No mailer. Accounts are username-only and their auth addresses cannot receive mail;
+# an admin resets a forgotten password through the admin-reset-password function.
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
@@ -332,39 +315,7 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack_oidc`, `spotify`, `workos`, `zoom`.
-# Apple ships with Google, not after it: guideline 4.8 requires an equivalent
-# privacy-respecting login wherever a third-party one is offered.
-#
-# client_id takes the iOS bundle identifier for the native Sign in with Apple flow.
-# secret is the generated client-secret JWT, needed only for the web OAuth flow.
-[auth.external.apple]
-enabled = true
-client_id = "env(SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID)"
-# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
-secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
-# Overrides the default auth callback URL derived from auth.external_url.
-redirect_uri = ""
-# Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,
-# or any other third-party OIDC providers.
-url = ""
-# If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
-skip_nonce_check = false
-# Sign in with Apple can withhold the address behind a relay, and a club member who
-# hides it still gets a profile: nothing here needs a real inbox.
-email_optional = true
-
-# client_id holds every OAuth client that may present an ID token — for a native iOS
-# sign-in that is the iOS client and the web client, comma-separated.
-[auth.external.google]
-enabled = true
-client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
-secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
-redirect_uri = ""
-url = ""
-# The native Google sign-in library does not return the nonce it signed, so the
-# check cannot be satisfied from the app.
-skip_nonce_check = true
-email_optional = false
+# None enabled: accounts are username and password only (spec, Identity and auth).
 
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
@@ -427,8 +378,9 @@ port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
 
-# Every function below is reached with a JWT: a club member's for confirm-game, the
-# service role's for the three the server calls. None of them is public.
+# Every function below is reached with a JWT: a club member's for confirm-game and
+# admin, the service role's for the ones the server and the scheduler call. None of
+# them is public.
 [functions.confirm-game]
 verify_jwt = true
 
@@ -439,6 +391,12 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.notify-players]
+verify_jwt = true
+
+[functions.weekly-recap]
+verify_jwt = true
+
+[functions.admin]
 verify_jwt = true
 
 # Experimental features may be deprecated any time

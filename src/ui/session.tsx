@@ -5,8 +5,8 @@ import { keys } from './queries';
 
 /**
  * Who is using the app, as the four states the router actually branches on. An
- * account can exist without a profile — signing up with Google creates the first and
- * not the second — and "needs-profile" is that gap, not an error.
+ * account can exist without a profile — signing up creates the first, and the
+ * profile step that follows makes the second — and "needs-profile" is that gap, not an error.
  */
 export type SessionStatus =
   | 'loading'

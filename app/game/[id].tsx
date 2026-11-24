@@ -1,14 +1,15 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 import type { ConfirmationState } from '../../src/domain/game-lifecycle';
 import { Pending, Problem } from '../../src/ui/components/async';
+import { AdminGamePanel } from '../../src/ui/components/admin-game-panel';
 import { Button, ButtonRow } from '../../src/ui/components/button';
 import { GameCard } from '../../src/ui/components/game-card';
 import { answerOf, lineupOf } from '../../src/ui/game-row';
-import { useAnswerGame, useGame } from '../../src/ui/queries';
+import { useAnswerGame, useGame, usePhotoUrl } from '../../src/ui/queries';
 import { useMember } from '../../src/ui/session';
-import { colour, font, layout, space } from '../../src/ui/theme';
+import { colour, font, layout, radius, space } from '../../src/ui/theme';
 
 /**
  * One game in full, and whatever is still open to the viewer. Who has answered is
@@ -21,6 +22,7 @@ export default function GameDetail() {
   const me = useMember();
 
   const game = useGame(id);
+  const photo = usePhotoUrl(game.data?.photo_path ?? null);
   const answering = useAnswerGame(me.id);
   const [armed, setArmed] = useState(false);
   const now = Date.now();
@@ -40,6 +42,14 @@ export default function GameDetail() {
   return (
     <ScrollView contentContainerStyle={layout.page} style={layout.screen}>
       <GameCard now={now} row={row} viewerId={me.id} />
+
+      {photo.data === undefined ? null : (
+        <Image
+          accessibilityLabel="Photo from the game"
+          source={{ uri: photo.data }}
+          style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: radius.card }}
+        />
+      )}
 
       {row.status !== 'pending' ? null : (
         <View style={layout.card}>
@@ -125,6 +135,8 @@ export default function GameDetail() {
       {answering.isError ? (
         <Text style={[font.dim, { color: colour.down }]}>{answering.error.message}</Text>
       ) : null}
+
+      {me.is_admin ? <AdminGamePanel row={row} /> : null}
     </ScrollView>
   );
 }

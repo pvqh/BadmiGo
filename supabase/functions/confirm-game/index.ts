@@ -1,6 +1,6 @@
 import { applyGameEvent } from '../_shared/game-state.ts';
 import { callerProfileId, json, serviceClient } from '../_shared/supabase.ts';
-import type { GameEvent, GameStatus } from '../../../src/domain/game-lifecycle.ts';
+import type { GameEvent } from '../../../src/domain/game-lifecycle.ts';
 
 /**
  * A participant's answer to a logged game. The three answers a phone may send are
@@ -53,21 +53,15 @@ Deno.serve(async (request) => {
   let replayed = false;
   if (outcome.state.status === 'confirmed') {
     const replay = await service.functions.invoke('replay-ratings');
+    if (replay.error !== null) console.error('replay after confirmation failed', replay.error);
     replayed = replay.error === null;
   }
 
-  const notify = notificationFor(outcome.state.status);
-  if (notify !== null) {
+  if (outcome.state.status === 'disputed') {
     await service.functions.invoke('notify-players', {
-      body: { gameId: body.gameId, kind: notify },
+      body: { gameId: body.gameId, kind: 'dispute' },
     });
   }
 
   return json({ status: outcome.state.status, replayed });
 });
-
-function notificationFor(status: GameStatus): 'confirmed' | 'dispute' | null {
-  if (status === 'confirmed') return 'confirmed';
-  if (status === 'disputed') return 'dispute';
-  return null;
-}

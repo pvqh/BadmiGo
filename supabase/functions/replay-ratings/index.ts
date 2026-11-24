@@ -1,7 +1,9 @@
-import { replayRatings, type PlayerSeed, type RatedGame } from '../../../src/domain/rating.ts';
-import type { Tier } from '../../../src/domain/types.ts';
+import { overtaken } from '../../../src/domain/overtaken.ts';
+import { replayRatings } from '../../../src/domain/rating.ts';
 import type { Json } from '../../../src/data/database.types.ts';
-import { callerClient, json } from '../_shared/supabase.ts';
+import { pushEach } from '../_shared/push.ts';
+import { parseReplayInput } from '../_shared/replay-input.ts';
+import { callerClient, json, type ServiceClient } from '../_shared/supabase.ts';
 
 const PERMISSION_DENIED = '42501';
 
@@ -26,7 +28,7 @@ Deno.serve(async (request) => {
   }
 
   const started = Date.now();
-  const { seeds, games } = parse(input.data);
+  const { seeds, games } = parseReplayInput(input.data);
   const result = replayRatings({ seeds, games, now: started });
   const durationMs = Date.now() - started;
 
@@ -37,8 +39,44 @@ Deno.serve(async (request) => {
   });
   if (applied.error !== null) return json({ error: applied.error.message }, 500);
 
+  // apply_replay hands back the ladder it replaced.
+  const before = applied.data.map((row) => ({
+    profileId: row.profile_id,
+    displayRating: row.display_rating,
+    active: row.is_active,
+    inPlacement: row.in_placement,
+  }));
+  // The ladder is already rebuilt; a push that fails must not report the replay as failed.
+  await announcePasses(caller, overtaken(before, result.ratings)).catch((error) =>
+    console.error('overtaken notifications failed', error),
+  );
+
   return json({ games: games.length, players: result.ratings.length, durationMs });
 });
+
+async function announcePasses(
+  service: ServiceClient,
+  passed: ReadonlyMap<string, readonly string[]>,
+): Promise<void> {
+  if (passed.size === 0) return;
+
+  const names = await service.from('profiles').select('id, display_name');
+  if (names.error !== null) throw new Error(names.error.message);
+  const nameOf = new Map(names.data.map((row) => [row.id, row.display_name]));
+
+  await pushEach(
+    service,
+    'overtaken_on_ladder',
+    [...passed].map(([profileId, by]) => ({
+      profileId,
+      message: {
+        title: 'You were passed on the ladder',
+        body: `${by.map((id) => nameOf.get(id) ?? 'Someone').join(', ')} moved above you.`,
+        path: '',
+      },
+    })),
+  );
+}
 
 /**
  * The engine returns readonly interfaces. They serialize to json exactly as the SQL
@@ -48,73 +86,4 @@ Deno.serve(async (request) => {
  */
 function asJson(value: readonly object[]): Json {
   return value as unknown as Json;
-}
-
-/**
- * The payload crosses from Postgres as json, so it is narrowed rather than asserted.
- * A replay that quietly rated a malformed game is the one fault in this system that
- * replaying history cannot undo, because history is what would be wrong.
- */
-function parse(payload: unknown): {
-  readonly seeds: readonly PlayerSeed[];
-  readonly games: readonly RatedGame[];
-} {
-  const root = asRecord(payload, 'replay input');
-  return {
-    seeds: asArray(root.seeds, 'seeds').map(parseSeed),
-    games: asArray(root.games, 'games').map(parseGame),
-  };
-}
-
-const TIERS: readonly Tier[] = ['newbie', 'y', 'tby', 'tb-plus', 'kha'];
-
-function parseSeed(payload: unknown): PlayerSeed {
-  const seed = asRecord(payload, 'seed');
-  const seedTier = seed.seedTier;
-  if (typeof seedTier !== 'string' || !TIERS.includes(seedTier as Tier)) {
-    throw new Error(`seed tier ${String(seedTier)} is not one of the club tiers`);
-  }
-  return { profileId: asString(seed.profileId, 'seed profileId'), seedTier: seedTier as Tier };
-}
-
-function parseGame(payload: unknown): RatedGame {
-  const game = asRecord(payload, 'game');
-  return {
-    id: asString(game.id, 'game id'),
-    playedAt: asNumber(game.playedAt, 'playedAt'),
-    sideA: asPair(game.sideA, 'sideA'),
-    sideB: asPair(game.sideB, 'sideB'),
-    scoreA: asNumber(game.scoreA, 'scoreA'),
-    scoreB: asNumber(game.scoreB, 'scoreB'),
-  };
-}
-
-function asRecord(value: unknown, what: string): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error(`${what} is not an object`);
-  }
-  return value as Record<string, unknown>;
-}
-
-function asArray(value: unknown, what: string): readonly unknown[] {
-  if (!Array.isArray(value)) throw new Error(`${what} is not an array`);
-  return value;
-}
-
-function asString(value: unknown, what: string): string {
-  if (typeof value !== 'string' || value === '') throw new Error(`${what} is not a string`);
-  return value;
-}
-
-function asNumber(value: unknown, what: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new Error(`${what} is not a number`);
-  }
-  return value;
-}
-
-function asPair(value: unknown, what: string): readonly [string, string] {
-  const side = asArray(value, what);
-  if (side.length !== 2) throw new Error(`${what} holds ${side.length} players, not two`);
-  return [asString(side[0], what), asString(side[1], what)];
 }

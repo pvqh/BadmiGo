@@ -34,18 +34,14 @@ Deno.serve(async (request) => {
     if (outcome.ok) accepted.push(game.id);
   }
 
-  // One replay for the whole sweep, then wake the phones whose ranks just moved.
+  // One replay for the whole sweep. `replayed` is what the scheduler's log is read
+  // for, so a quiet hour reports false rather than claiming a replay that never ran.
+  let replayed = false;
   if (accepted.length > 0) {
     const replay = await caller.functions.invoke('replay-ratings');
-    if (replay.error !== null) {
-      return json({ swept: pending.data.length, accepted: accepted.length, replayed: false });
-    }
-    for (const gameId of accepted) {
-      await caller.functions.invoke('notify-players', {
-        body: { gameId, kind: 'confirmed' },
-      });
-    }
+    if (replay.error !== null) console.error('replay after auto-accept failed', replay.error);
+    replayed = replay.error === null;
   }
 
-  return json({ swept: pending.data.length, accepted: accepted.length, replayed: true });
+  return json({ swept: pending.data.length, accepted: accepted.length, replayed });
 });

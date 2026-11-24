@@ -1,6 +1,7 @@
 {
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@^2.58.0",
-    "openskill": "npm:openskill@^4.0.3"
+    "openskill": "npm:openskill@^4.0.3",
+    "web-push": "npm:web-push@^3.6.7"
   }
 }

@@ -5,10 +5,10 @@ If something you are about to build is not in the spec, stop and ask.
 
 ## What this is
 
-A free iOS app for one badminton community (~30 players, two 2-hour sessions every
-Saturday and Sunday, ~300 rated doubles games per month). Players log their doubles
-games, the other participants confirm, an OpenSkill rating moves, and a home-screen
-widget shows the ladder.
+A free web app for one badminton community (~30 players, two 2-hour sessions every
+Saturday and Sunday, ~300 rated doubles games per month), saved to each player's
+home screen. Players log their doubles games, the other participants confirm, and an
+OpenSkill rating moves the ladder.
 
 Not a commercial product. There is no monetisation in scope and no payer to design
 for. Do not propose pricing, growth features, or onboarding funnels.
@@ -62,16 +62,14 @@ looks impressive and cannot be maintained is worse than no code.
 
 ## Stack
 
-- Expo + React Native, TypeScript, **iOS only**.
-- Supabase free tier: Postgres, Auth, Realtime, Edge Functions.
+- Expo + React Native, TypeScript, exported as a **static web build**; tested in
+  iPhone Safari, installed to the home screen.
+- Supabase free tier: Postgres, Auth, Storage (game photos), Edge Functions.
 - `openskill.js` for the rating model, executed in an Edge Function.
-- Resend as SMTP for auth email. Supabase's built-in mailer is rate-limited to a
-  trickle and must not be relied on for password resets.
-- Widget: native WidgetKit extension in Swift via `expo-apple-targets`, sharing
-  data through an App Group.
-- Distribution: TestFlight only. Not the public App Store.
-- Apple Developer Program ($99/yr) is required — the App Group entitlement the
-  widget needs is unavailable to free personal teams. It is the project's only cost.
+- Username-and-password accounts only. The app sends no email; an admin resets a
+  forgotten password.
+- Distribution: GitHub Pages only. No app store, no TestFlight, no native build.
+- Push: Web Push from a service worker. No widget. Nothing costs money.
 
 ## Glossary
 
@@ -143,3 +141,21 @@ Append-only. Newest last. One line each: date, decision, reason.
 - 2026-11-24 — The tier the club calls "TB" is spelled TB, not TBY, in the glossary and on screen. The slug stays `tby` in code and the database, because renaming an enum value is a migration with no user-visible gain.
 - 2026-11-24 — A confirmed game's detail no longer lists who confirmed it (story 45); the per-player answers show only while the game is pending (story 29).
 - 2026-11-24 — Settings is its own tab instead of a screen pushed from the Me header. On the Everyone filter the ladder raises the top three onto a podium (Men and Women stay plain lists); every filter shows the member's own rank with the gap to the player above (`src/ui/standing.ts`), all read from the existing ladder query: no new data, no new dependency.
+- 2026-11-24 — Web app on GitHub Pages instead of an iOS app on TestFlight; the widget, Sign in with Apple and the $99 Apple Developer account are dropped, at the author's call, so the project costs nothing. Stories 4 and 55–60 removed, 75–77 added for home-screen install. The widget-era entries above stand as history.
+- 2026-11-24 — Username-only signup, at the author's call: email and Google sign-in are dropped (stories 2, 3), and with them Resend. A forgotten password is reset by an admin setting a temporary one (story 5 revised), because there is no address to send a reset to.
+- 2026-11-24 — Dependencies added for the web build: `react-native-web` and `react-dom` (Expo's web renderer; `react-dom` was already pinned by the override and is now a direct dependency). The export is a single-page app under `experiments.baseUrl` `/BadmiGo`; `public/index.html` is its template, and `npm run export:web` copies `index.html` to `404.html` because GitHub Pages has no rewrites.
+- 2026-11-24 — `web-push` (npm, Edge Functions only) signs and encrypts Web Push messages: VAPID JWTs and aes128gcm payload encryption are exactly the code not to hand-roll. It always sends over HTTPS, which every real push service is.
+- 2026-11-24 — `push_tokens` replaced by `push_subscriptions` (endpoint, p256dh, auth), dropped rather than migrated since nothing had been registered. The widget's silent `confirmed` wake is gone from `notify-players`; iPhone shows every web push, so a silent one is not possible anyway.
+- 2026-11-24 — Story 70's "implausible activity" is two flags read off the record in `src/domain/flags`: a disputed game, and a game confirmed by the clock with no answer from the other three inside the window. Scores are not second-guessed; the four public names are the check on those.
+- 2026-11-24 — Admin actions (score correction, void, resolve, seed tier, merge, temporary password) go through one `admin` Edge Function with an `action` field, for the same reason as `notify-players`; each one that changes rating input ends in a replay. Appointing an admin stays a direct update, because RLS already allows it and it moves no rating.
+- 2026-11-24 — A merge is refused when both accounts played in the same game (void it first), moves games, answers and logged games to the kept account in one transaction, and deletes the duplicate's auth account so it cannot quietly make a fresh profile.
+- 2026-11-24 — "Passed on the ladder" (story 63) counts only players ranked both before and after a replay, ties broken by profile id as the replay orders them, and is sent from `replay-ratings`; a failed push never fails a replay.
+- 2026-11-24 — The weekly recap covers the last seven days and is scheduled for Sunday 13:00 UTC, which is 20:00 in Vietnam.
+- 2026-11-24 — Game photos: a private `game-photos` bucket taking JPEGs up to 512 KB, shrunk in the browser to a 1280 px long edge first, and a `games` constraint that a photo path sits in the logger's own folder. Storage is the one thing that could cost money.
+- 2026-11-24 — Fixed the four problems in manual Part 12: the misordered pending and rating-history queries, colliding replays (an advisory lock in `apply_replay`), `auto-accept` claiming a replay it never ran and `confirm-game` dropping replay errors, and the purity guard's `expo-` and clock holes.
+- 2026-11-24 — `create_my_profile` lost its `p_username` parameter and refuses any account not on the synthetic username domain. `database.types.ts` is regenerated from the migrations again, so the earlier hand patch is gone.
+- 2026-11-24 — `.env.example` is tracked again (`!.env.example`). `supabase/.env.example` is deleted because `config.toml` no longer reads any env var; the VAPID keys live in `supabase/functions/.env`, documented by its `.example`.
+- 2026-11-24 — Story 78, confirm all, at the author's call: a button on the Feed's waiting list when a member owes two or more answers. It calls `confirm-game` once per game, one after another, rather than a new batch endpoint, so every confirmation takes the one tested path and replays never overlap.
+- 2026-11-24 — Review fixes: `src/data/function-contract.ts` holds what the app and the Edge Functions must agree on (`AdminAction`, `MIN_PASSWORD`) and imports only domain types, so Deno imports it as it does `database.types.ts`; `TIERS`, `asTier` and `asGameFormat` live beside `GAME_FORMATS` in `src/domain/types`. Every Edge Function call from the app goes through `invoke` in `src/data/client.ts`, so a refusal shows the function's own reason.
+- 2026-11-24 — `merge_profiles` deletes the duplicate's `auth.users` row itself, and the cascade removes the profile, so a merge cannot stop halfway with a working login and no profile. The photo-path rule became an insert trigger instead of a check constraint, because the constraint refused any merge of a duplicate who had logged a game with a photo.
+- 2026-11-24 — `apply_replay` returns the ladder it replaced, read under its advisory lock, and `replay-ratings` compares against that instead of reading the ladder itself before the lock, so two queued replays can no longer send the same "you were passed" push twice.

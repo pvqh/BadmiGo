@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { PLACEMENT_GAMES, tierFor } from '../domain/rating-scale';
 import { replayRatings, type PlayerRating } from '../domain/rating';
-import type { Tier } from '../domain/types';
+import { TIERS } from '../domain/types';
 import { simulateSeason, syntheticClub, type SyntheticPlayer } from './club';
 
 const SEED = 20261103;
-const TIERS: readonly Tier[] = ['newbie', 'y', 'tby', 'tb-plus', 'kha'];
 
 const club = syntheticClub(SEED);
 const season = simulateSeason(club, { seed: SEED });

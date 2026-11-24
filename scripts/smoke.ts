@@ -9,87 +9,7 @@
  *
  *   npx supabase start && npm run smoke
  */
-import { execSync } from 'node:child_process';
-
-interface Local {
-  readonly API_URL: string;
-  readonly ANON_KEY: string;
-  readonly SERVICE_ROLE_KEY: string;
-}
-
-function localCredentials(): Local {
-  const output = execSync('npx supabase status -o json', { encoding: 'utf8' });
-  const status: unknown = JSON.parse(output);
-  if (typeof status !== 'object' || status === null) throw new Error('supabase status gave no json');
-  const { API_URL, ANON_KEY, SERVICE_ROLE_KEY } = status as Record<string, unknown>;
-  if (typeof API_URL !== 'string' || typeof ANON_KEY !== 'string'
-    || typeof SERVICE_ROLE_KEY !== 'string') {
-    throw new Error('supabase status is missing the local keys; is the stack running?');
-  }
-  return { API_URL, ANON_KEY, SERVICE_ROLE_KEY };
-}
-
-const local = localCredentials();
-
-let checks = 0;
-
-function check(condition: boolean, what: string): void {
-  if (!condition) throw new Error(`FAILED: ${what}`);
-  checks += 1;
-  console.log(`  ok  ${what}`);
-}
-
-async function call(
-  path: string,
-  options: { token: string; body?: unknown; method?: string },
-): Promise<{ status: number; body: unknown }> {
-  const response = await fetch(`${local.API_URL}${path}`, {
-    method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
-    headers: {
-      apikey: local.ANON_KEY,
-      Authorization: `Bearer ${options.token}`,
-      'Content-Type': 'application/json',
-    },
-    ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-  });
-  const text = await response.text();
-  return { status: response.status, body: text === '' ? null : JSON.parse(text) };
-}
-
-interface Member {
-  readonly username: string;
-  readonly token: string;
-  readonly profileId: string;
-}
-
-const SEEDS = ['kha', 'tb-plus', 'newbie', 'newbie'] as const;
-
-async function register(index: number, run: string): Promise<Member> {
-  const username = `smoke_${run}_${index}`;
-  const signUp = await call('/auth/v1/signup', {
-    token: local.ANON_KEY,
-    body: { email: `${username}@users.badminton-ladder.invalid`, password: 'correct-horse-9' },
-  });
-  if (signUp.status !== 200) throw new Error(`signup failed: ${JSON.stringify(signUp.body)}`);
-
-  const { access_token: token, user } = signUp.body as {
-    access_token: string;
-    user: { id: string };
-  };
-
-  const profile = await call('/rest/v1/rpc/create_my_profile', {
-    token,
-    body: {
-      p_username: username,
-      p_display_name: `Smoke ${index}`,
-      p_gender: index % 2 === 0 ? 'male' : 'female',
-      p_seed_tier: SEEDS[index],
-    },
-  });
-  if (profile.status !== 200) throw new Error(`profile failed: ${JSON.stringify(profile.body)}`);
-
-  return { username, token, profileId: user.id };
-}
+import { call, check, checksPassed, local, register, type Member } from './smoke-client.ts';
 
 async function main(): Promise<void> {
   const run = Math.random().toString(36).slice(2, 8);
@@ -162,7 +82,112 @@ async function main(): Promise<void> {
 
   await assertRatingsMoved(gameId, members);
 
-  console.log(`\n${checks} checks passed\n`);
+  await assertAdminCorrects(gameId, members);
+
+  await assertMerge(members, run);
+
+  await assertUsernameOnly(run);
+
+  console.log(`\n${checksPassed()} checks passed\n`);
+}
+
+/**
+ * The admin route: refused to a member, and for an admin a corrected score ends in a
+ * replay without anyone asking for one (story 67).
+ */
+async function assertAdminCorrects(gameId: string, members: readonly Member[]): Promise<void> {
+  console.log('\nthe admin');
+  const [admin, partner, left] = members;
+
+  const refused = await call('/functions/v1/admin', {
+    token: left.token,
+    body: { action: 'resolve', gameId },
+  });
+  check(refused.status === 403, 'a member who is not an admin is refused');
+
+  const promoted = await call(`/rest/v1/profiles?id=eq.${admin.profileId}`, {
+    token: local.SERVICE_ROLE_KEY,
+    method: 'PATCH',
+    body: { is_admin: true },
+  });
+  check(promoted.status < 300, 'the service role can appoint the first admin');
+
+  const corrected = await call('/functions/v1/admin', {
+    token: admin.token,
+    body: { action: 'correct-score', gameId, scoreA: 21, scoreB: 18 },
+  });
+  check(corrected.status === 200, 'an admin can correct a score');
+  check((corrected.body as { replayed: boolean }).replayed, 'and the correction replayed');
+
+  const changes = await call(
+    `/rest/v1/rating_history?game_id=eq.${gameId}&profile_id=eq.${admin.profileId}` +
+      '&select=mu_before,mu_after',
+    { token: admin.token },
+  );
+  const change = (changes.body as { mu_before: number; mu_after: number }[])[0];
+  check(change.mu_after > change.mu_before, 'the side that now won the game gained skill');
+
+  const invalid = await call('/functions/v1/admin', {
+    token: admin.token,
+    body: { action: 'correct-score', gameId, scoreA: 21, scoreB: 20 },
+  });
+  check(invalid.status === 409, 'an impossible score is refused by the domain rules');
+
+  const reset = await call('/functions/v1/admin', {
+    token: admin.token,
+    body: { action: 'reset-password', profileId: partner.profileId, password: 'temporary-9' },
+  });
+  check(reset.status === 200, 'an admin can set a temporary password');
+
+  const signIn = await call('/auth/v1/token?grant_type=password', {
+    token: local.ANON_KEY,
+    body: { email: `${partner.username}@users.badminton-ladder.invalid`, password: 'temporary-9' },
+  });
+  check(signIn.status === 200, 'and the member can sign in with it');
+}
+
+/**
+ * Story 69. A merge deletes the duplicate's login in the same transaction as its
+ * profile, so the duplicate can never sign in again and make a fresh one.
+ */
+async function assertMerge(members: readonly Member[], run: string): Promise<void> {
+  console.log('\nmerging a duplicate');
+  const [admin, , , left] = members;
+
+  const sameGame = await call('/functions/v1/admin', {
+    token: admin.token,
+    body: { action: 'merge', keepId: admin.profileId, mergeId: left.profileId },
+  });
+  check(sameGame.status === 409, 'two accounts from the same game are not merged');
+
+  const duplicate = await register(2, `${run}_dup`);
+  const merged = await call('/functions/v1/admin', {
+    token: admin.token,
+    body: { action: 'merge', keepId: admin.profileId, mergeId: duplicate.profileId },
+  });
+  check(merged.status === 200, 'an admin can merge a duplicate account');
+
+  const signIn = await call('/auth/v1/token?grant_type=password', {
+    token: local.ANON_KEY,
+    body: { email: `${duplicate.username}@users.badminton-ladder.invalid`, password: 'correct-horse-9' },
+  });
+  check(signIn.status === 400, 'and the duplicate can no longer sign in');
+}
+
+/** Supabase Auth will make an account for any address; only a username one may join. */
+async function assertUsernameOnly(run: string): Promise<void> {
+  console.log('\nusername-only membership');
+  const signUp = await call('/auth/v1/signup', {
+    token: local.ANON_KEY,
+    body: { email: `smoke-${run}@example.com`, password: 'correct-horse-9' },
+  });
+  const { access_token: token } = signUp.body as { access_token: string };
+
+  const profile = await call('/rest/v1/rpc/create_my_profile', {
+    token,
+    body: { p_display_name: 'Real Email', p_gender: 'male', p_seed_tier: 'y' },
+  });
+  check(profile.status >= 400, 'an account made with a real email cannot become a member');
 }
 
 async function assertRatingsMoved(gameId: string, members: readonly Member[]): Promise<void> {

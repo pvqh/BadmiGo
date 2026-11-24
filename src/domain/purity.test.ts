@@ -27,8 +27,22 @@ describe('domain core purity', () => {
   it.each(FORBIDDEN)('imports nothing from %s', (forbidden) => {
     const offenders = sources.filter((path) =>
       importedModules(readFileSync(path, 'utf8')).some(
-        (module) => module === forbidden || module.startsWith(`${forbidden}/`),
+        // `expo-` as well as `expo/`: the real packages are expo-router, expo-linking and so on.
+        (module) =>
+          module === forbidden ||
+          module.startsWith(`${forbidden}/`) ||
+          module.startsWith(`${forbidden}-`),
       ),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  // The spec promises time is passed in, so a replay is a pure function of its input.
+  it('never reads the system clock', () => {
+    const offenders = sources.filter(
+      (path) =>
+        !path.endsWith('.test.ts') &&
+        /Date\.now\(|new Date\(\)/.test(readFileSync(path, 'utf8')),
     );
     expect(offenders).toEqual([]);
   });

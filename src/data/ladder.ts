@@ -45,14 +45,20 @@ export async function readRating(profileId: ProfileId) {
   return data;
 }
 
-/** A player's rating over time, oldest first, for the graph on their profile. */
+/**
+ * A player's rating over time, oldest first, for the graph on their profile, in the
+ * replay's own order. `games(played_at)` orders the rows by the joined game; a
+ * referencedTable order would only sort inside the embed.
+ */
 export async function readRatingHistory(profileId: ProfileId) {
   return unwrap(
     await supabase
       .from('rating_history')
-      .select('game_id, display_before, display_after, games!inner (played_at)')
+      .select('game_id, display_before, display_after, games!inner (played_at, created_at)')
       .eq('profile_id', profileId)
-      .order('played_at', { referencedTable: 'games', ascending: true }),
+      .order('games(played_at)')
+      .order('games(created_at)')
+      .order('game_id'),
   );
 }
 

@@ -3,7 +3,7 @@ import type { Database } from '../../../src/data/database.types.ts';
 
 export type ServiceClient = SupabaseClient<Database>;
 
-function required(name: string): string {
+export function required(name: string): string {
   const value = Deno.env.get(name);
   if (value === undefined || value === '') {
     throw new Error(`${name} is missing from the function environment`);

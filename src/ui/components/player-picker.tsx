@@ -1,3 +1,4 @@
+import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -34,6 +35,7 @@ export function PlayerPicker({
 }) {
   const me = useMember();
   const [term, setTerm] = useState('');
+  const invite = useMutation({ mutationFn: shareInvite });
 
   const found = usePlayerSearch(term);
   const played = usePlayerGames(me.id);
@@ -52,6 +54,7 @@ export function PlayerPicker({
 
   const close = () => {
     setTerm('');
+    invite.reset();
     onClose();
   };
 
@@ -95,9 +98,22 @@ export function PlayerPicker({
           ListEmptyComponent={
             found.isPending ? undefined : (
               <Text style={font.dim}>
-                {`Nobody called "${term.trim()}". Everyone in a game needs an account, so ask them to sign up first.`}
+                {`Nobody called "${term.trim()}". Everyone in a game needs an account, so send them the link below.`}
               </Text>
             )
+          }
+          ListFooterComponent={
+            <View style={{ gap: space.tight, paddingVertical: space.gap }}>
+              <Pressable accessibilityRole="button" onPress={() => invite.mutate()}>
+                <Text style={[font.body, { color: colour.accent }]}>Invite someone new</Text>
+              </Pressable>
+              {invite.data === 'copied' ? (
+                <Text style={font.dim}>Link copied. Send it to them.</Text>
+              ) : null}
+              {invite.isError ? (
+                <Text style={[font.dim, { color: colour.down }]}>{invite.error.message}</Text>
+              ) : null}
+            </View>
           }
           keyExtractor={(player) => player.profileId}
           keyboardShouldPersistTaps="handled"
@@ -123,6 +139,26 @@ export function PlayerPicker({
       </View>
     </Modal>
   );
+}
+
+/**
+ * Story 11: the sign-up link, handed to the phone's own share sheet so it can go by
+ * whatever app the friend uses, or copied where there is no share sheet.
+ */
+async function shareInvite(): Promise<'shared' | 'copied' | 'cancelled'> {
+  const url = `${window.location.origin}${process.env.EXPO_BASE_URL ?? ''}/sign-up`;
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ title: 'Join the badminton ladder', url });
+      return 'shared';
+    } catch (error) {
+      // Closing the share sheet without sending is a choice, not a failure.
+      if (error instanceof Error && error.name === 'AbortError') return 'cancelled';
+      // Refused rather than cancelled: copying still gets the link to them.
+    }
+  }
+  await navigator.clipboard.writeText(url);
+  return 'copied';
 }
 
 /** Everyone the member has played with or against, most recently met first. */

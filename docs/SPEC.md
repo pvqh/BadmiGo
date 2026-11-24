@@ -1,6 +1,8 @@
 # Spec — Badminton Club Ladder (v1)
 
 Status: agreed 2026-11-03. Source: five-round design interview.
+Revised 2026-11-24: a web app saved to the home screen, hosted on GitHub Pages; the
+widget and the Apple Developer account are dropped.
 Read alongside `../CLAUDE.md`, which holds the hard rules and glossary.
 
 ## Problem Statement
@@ -18,14 +20,19 @@ and no way to settle an argument.
 The organiser wants that record to be ambient rather than something people have to
 go looking for — visible on the home screen the way Locket made shared photos
 ambient, so the ladder is part of the week rather than a page in yet another app
-nobody opens.
+nobody opens. (The widget that answered this was dropped on 2026-11-24 to keep the
+project free; the home-screen icon opening onto the ladder is the accepted, weaker
+substitute.)
 
 ## Solution
 
-An iOS app, free, for this one community.
+A web app, free, for this one community. Each player opens it once in their phone's
+browser and adds it to the home screen, after which it opens full-screen like an
+app. It is a static site on GitHub Pages: no app store, no TestFlight, no Apple
+Developer account.
 
 After a game, any participant logs it: four players, two per side, and the score.
-The other three get a push notification and confirm with one tap. Once confirmed,
+The other three get a push notification and confirm in one tap. Once confirmed,
 an OpenSkill rating moves for all four — up or down depending on how surprising the
 result was — and the game appears in a club-wide feed showing everyone's rating
 change.
@@ -35,8 +42,8 @@ player gets a tier label in the club's own vocabulary (Newbie, Y, TB, TB+, Khá)
 a rating graph over time, head-to-head records, and a partner breakdown showing who
 they win most and least with.
 
-A large home-screen widget shows the top five men, the top five women, and the
-viewer's own rank, refreshing shortly after a game they played is confirmed.
+The home-screen icon opens straight onto the ladder, so where a player stands is one
+tap away.
 
 Because every game carries all four names publicly and needs their agreement, the
 record polices itself without anyone being appointed referee.
@@ -46,10 +53,10 @@ record polices itself without anyone being appointed referee.
 ### Signing up and getting in
 
 1. As a club player, I want to sign up with a username and password, so that I can join without sharing an email address.
-2. As a club player, I want to sign up with my email and a password, so that I can use the method I am used to.
-3. As a club player, I want to sign in with Google, so that I can get in with one tap.
-4. As an iPhone user, I want to sign in with Apple, so that I can register without handing over personal details.
-5. As a player who forgot my password, I want to reset it by email and actually receive that email, so that I can get back in without asking the admin.
+2. ~~As a club player, I want to sign up with my email and a password, so that I can use the method I am used to.~~ Removed 2026-11-24: username only, for simplicity.
+3. ~~As a club player, I want to sign in with Google, so that I can get in with one tap.~~ Removed 2026-11-24: username only, for simplicity.
+4. ~~As an iPhone user, I want to sign in with Apple, so that I can register without handing over personal details.~~ Removed 2026-11-24: Sign in with Apple on the web needs a paid Apple Developer account, and the App Store rule that made it mandatory alongside Google no longer applies.
+5. As a player who forgot my password, I want the admin to set me a temporary password courtside, so that I can get back in without an email address. (Revised 2026-11-24: there is no email to reset by.)
 6. As a player, I want to change my password from inside the app, so that I can manage my own account.
 7. As a new member, I want to declare my current level at signup, so that my rating starts near reality instead of making me grind up from zero.
 8. As a new member, I want signup to take under thirty seconds, so that I can register courtside between games.
@@ -74,18 +81,19 @@ record polices itself without anyone being appointed referee.
 ### Confirming and disputing
 
 22. As a player named in a game, I want a push notification asking me to confirm, so that nothing is recorded about me without my knowledge.
-23. As a confirming player, I want to approve with a single tap from the notification or the banner, so that confirming never feels like a chore.
+23. As a confirming player, I want the notification or the banner to take me to the game, where one tap approves it, so that confirming never feels like a chore. (Web notifications on iPhone carry no action buttons, so approving from the notification itself is not possible.)
 24. As a player who disagrees with a logged score, I want to dispute it, so that a wrong result does not move my rating.
 25. As any participant in a disputed game, I want to be notified of the dispute, so that we can sort it out in person at the next session.
 26. As a club, we want games that nobody responded to to auto-accept after twenty-four hours, so that the ladder is not held hostage by one person who does not open the app.
 27. As a player, I want pending games to move nobody's rating, so that the ladder only ever reflects agreed results.
 28. As a player with games awaiting my response, I want a banner when I open the app, so that I can clear them even if I missed the push.
 29. As a player, I want to see which of the other three have confirmed so far, so that I know whether a game is nearly settled.
+78. As a player with several games awaiting my response, I want to confirm them all with one tap from the list of them, so that clearing a whole session's games is not a dozen round trips. Disputing stays one game at a time.
 
 ### The ladder and the rating
 
 30. As a club player, I want one club ladder, so that I know where I stand among everyone I play with.
-31. As a club player, I want to filter the ladder to men's or women's rankings, so that I can see the same splits the widget shows.
+31. As a club player, I want to filter the ladder to men's or women's rankings, so that I can see where I stand among the men or among the women.
 32. As a new player, I want a provisional badge rather than a rank until I have played five games, so that nobody judges me on two lucky results.
 33. As a player in placement, I want to see how many games remain before I am ranked, so that I know what I am working toward.
 34. As a player, I want a tier label in my club's own words — Newbie, Y, TB, TB+, Khá — so that my rating means something in the language we already use courtside.
@@ -116,14 +124,14 @@ record polices itself without anyone being appointed referee.
 53. As a player, I want the rating change shown against each of my recent games, so that I understand what moved me.
 54. As a player, I want to see how many games I have played this month, so that I know whether I am staying on the active ladder.
 
-### The widget
+### The home screen
 
-55. As a club player, I want a home-screen widget showing the top five men, so that the ladder is visible without opening anything.
-56. As a club player, I want the same widget to show the top five women, so that both ladders get equal visibility.
-57. As a club player, I want my own rank on the widget, so that I can see my position even when I am nowhere near the top five.
-58. As a club player, I want the widget to refresh shortly after a game I played is confirmed, so that it feels alive on weekends.
-59. As a player still in placement, I want the widget to show something sensible rather than an error or a zero, so that it is not broken during my first week.
-60. As a club player, I want to understand that the widget updates within minutes rather than instantly, so that I do not think it is broken.
+Stories 55 to 60 described a home-screen widget. Removed 2026-11-24 with the Apple
+Developer account: iOS gives web apps no widgets. Their numbers are not reused.
+
+75. As a club player, I want to add the app to my phone's home screen and have it open full-screen without browser bars, so that it feels like an app rather than a web page.
+76. As an iPhone user, I want clear instructions for adding it to my home screen, so that I can install it even though Safari offers no install button, and so that notifications work, since iPhone only delivers them to web apps on the home screen.
+77. As a club player, I want the home-screen icon to open straight onto the ladder, so that seeing where I stand is one tap.
 
 ### Notifications
 
@@ -143,7 +151,7 @@ record polices itself without anyone being appointed referee.
 71. As the admin, I want a per-player daily cap on logged games, so that nobody can flood the ladder by accident or otherwise.
 72. As the admin, I want to appoint a second admin, so that corrections do not wait for me when I am away for a weekend.
 73. As a club player, I want every game to carry all four names publicly, so that the record polices itself.
-74. As a club player, I want to know that ratings cannot be computed or altered from a phone, so that a modified app cannot fake a ranking.
+74. As a club player, I want to know that ratings cannot be computed or altered from a browser, so that a modified page cannot fake a ranking.
 
 ## Implementation Decisions
 
@@ -229,6 +237,9 @@ is explicitly untrusted and is never persisted.
   game to 11), four distinct players, two per side.
 - **`domain/stats`** — pure. Win/loss, partner breakdown, head-to-head, and
   performance-vs-expectation derived from the same game list.
+- **`domain/flags`, `domain/recap`, `domain/overtaken`** — pure. Which games an
+  admin should look at (story 70), what a player's week came to (story 62), and who
+  a replay moved past whom on the ladder (story 63). Added 2026-11-24.
 - **`data`** — the only module that talks to Supabase. Thin adapters; no business
   rules. Nothing above it imports the Supabase client directly.
 - **`ui`** — screens and components. Reads from `data`, formats output from
@@ -236,9 +247,11 @@ is explicitly untrusted and is never persisted.
 - **Edge Functions** — `replay-ratings` (recompute and persist derived tables),
   `confirm-game` (apply a confirmation event, trigger replay when a game becomes
   confirmed), `auto-accept` (scheduled, sweeps games past the 24h window),
-  `notify-widget` (silent push to participants after a confirmation).
-- **Widget extension** — Swift, WidgetKit, large size only. Renders a pre-computed
-  payload; contains no rating logic.
+  `notify-players` (web push to participants: confirmation requests and dispute
+  alerts), `weekly-recap` (scheduled, Sunday evening), `admin` (score correction,
+  void, resolve, seed tier, account merge and temporary password, each ending in a
+  replay where it changes rating input). `replay-ratings` also sends the opt-in
+  "passed on the ladder" push.
 
 ### Data model
 
@@ -265,41 +278,53 @@ tables at all — the Edge Function's service role owns them.
 
 ### Identity and auth
 
-Supabase Auth with email+password, Google, and Sign in with Apple. Apple's App Store
-guideline 4.8 requires an equivalent privacy-respecting login wherever a third-party
-service is offered, so Google implies Apple; both ship together.
+Username and password only (revised 2026-11-24). Email, Google and Apple sign-in were
+dropped for simplicity, and with them any email the app sends, so there is no SMTP
+provider.
 
-Username login needs a mapping layer, because Supabase authenticates by email:
-username is stored on `profiles` with a uniqueness constraint and a reserved-names
-list, and sign-in resolves username to email before calling Auth.
+Supabase authenticates by email, so each account's auth email is derived from its
+username (`<name>@users.badminton-ladder.invalid`, a domain that can never receive
+mail). Username is stored on `profiles` with a uniqueness constraint and a
+reserved-names list.
 
-Resend is wired in as custom SMTP from day one. Supabase's built-in mailer is
-rate-limited and not intended for production, and a password reset that silently
-never arrives is exactly how a community quietly stops using an app.
+A forgotten password is reset by an admin: an admin-only Edge Function sets a
+temporary password on the member's account, the admin hands it over courtside, and
+the member changes it in Settings (story 6). The function refuses any caller who is
+not an admin and never returns or logs the password it sets.
 
 All four participants must be registered accounts. Guest and placeholder profiles
 were considered and rejected. The accepted consequence is that signup must be
 sub-thirty-seconds and the player picker must offer a courtside invite link or QR
 when a name is not found.
 
-### Widget delivery
+### Web delivery
 
-Large size only in v1 — the spec's eleven rows (five men, five women, viewer's rank)
-do not fit a small or medium widget, and lock-screen widgets cannot hold them at all.
+The client is a static build (HTML, JS, CSS) published to GitHub Pages. Pages serves
+files only; it runs no server code, so everything server-side stays in Supabase:
+Postgres with row-level security, Auth, and the Edge Functions. The browser talks to
+Supabase directly with the public anon key, which is safe to ship because RLS, not
+secrecy, is the guard. The service-role key never enters the repository or the build.
 
-iOS does not let a widget poll. Three refresh paths together:
+Consequences of hosting on Pages:
 
-- A timeline refresh roughly hourly as the floor.
-- `reloadAllTimelines` when the app is foregrounded, so the logger sees their change
-  immediately.
-- A silent background push (`content-available`) to the other participants when a
-  game becomes confirmed, waking their app long enough to reload.
+- Pages has no rewrite rules, so a deep link such as `/game/<id>` must be served by a
+  `404.html` that loads the app and lets the router resolve the path.
+- A project site lives under `/<repo-name>/`, and the build must use that base path.
+- On a free GitHub account Pages only publishes from a public repository. That is
+  acceptable because the repository holds no secrets, only code.
 
-The app states "ranks update within a few minutes" in the UI. Chasing true realtime
-on an iOS widget is not winnable and is not attempted.
+Home-screen install uses a web app manifest (name, icons, `display: standalone`,
+start URL on the ladder) and an Apple touch icon. iPhone offers no install prompt, so
+the app shows its own "add to home screen" instructions when opened in a plain Safari
+tab.
 
-The widget renders a payload written to the App Group container by the host app. It
-does not query Supabase and does not hold a session token.
+Push is standard Web Push through a service worker, with VAPID keys held as an Edge
+Function secret. iPhone delivers web push only to a web app added to the home screen,
+on iOS 16.4 or later, and only after the player grants permission from a tap inside
+the app. A player who never installs gets no push; the pending-games banner (story 28)
+is their path, and the twenty-four-hour auto-accept keeps the ladder moving either
+way. The service worker exists for push only; it does not cache the app for offline
+use.
 
 ### Scope and sequencing
 
@@ -311,8 +336,8 @@ One computed rating pool for all genders. Gender splits the *display* only. A
 separate women's pool would have roughly eight players and would never converge.
 
 Build order: schema and auth → log, confirm, and the rating engine → ladder, feed,
-and stats → widget → TestFlight to a handful of players, then the whole club. Pay
-the Apple Developer fee before the widget step.
+and stats → GitHub Pages and home-screen install → web push → a handful of players,
+then the whole club.
 
 ## Testing Decisions
 
@@ -338,9 +363,10 @@ change.
 I/O, no clock, and no randomness. Every rule in this spec that can be wrong lives
 behind that seam and is tested directly against it.
 
-Everything outside it — `data`, `ui`, Edge Function handlers, the widget extension —
+Everything outside it — `data`, `ui`, Edge Function handlers, the service worker —
 is deliberately thin enough to need no unit tests. It is covered by manual
-verification on a device and by the end-to-end smoke check below. Where an Edge
+verification on a phone, installed to the home screen, and by the end-to-end smoke
+check below. Where an Edge
 Function appears to need a test, that is a signal a rule leaked out of the domain
 core; move the rule in rather than adding a second seam.
 
@@ -400,15 +426,18 @@ Not in v1, and not to be built opportunistically:
 
 - **Monetisation of any kind.** No subscriptions, no ads, no paid tiers. The project
   is free for one community; there is no payer to design for.
-- **Medium and small widgets.** Large only.
+- **Home-screen widgets of any size.** Dropped 2026-11-24 with the Apple Developer
+  account; iOS gives web apps no widgets.
+- **Offline use.** The app needs a connection; the service worker is for push only.
 - **Pairing and court-rotation suggestions.** Deferred deliberately, not forgotten
   — see Further Notes.
 - **Sessions, organisers, and groups.** Games are free-standing.
-- **Android.** iOS only. The data layer should not actively prevent it later, but no
-  work is spent enabling it.
+- **Android-specific work.** The club is on iPhone and the app is tested in iPhone
+  Safari. Android Chrome will likely work because it is the same web app, but no work
+  is spent on it.
 - **Separate singles, level-doubles, or mixed-doubles ladders.** One pool.
 - **Tournaments, brackets, challenges, and ladder matches.**
-- **Public App Store distribution.** TestFlight only.
+- **Any app store, TestFlight, or native build.** GitHub Pages only.
 - **Public or cross-club discovery.** One closed community, invite only.
 - **Chat, expense splitting, attendance tracking, court booking.** Other apps do
   these; this one does the ladder.
@@ -451,9 +480,9 @@ The author overrode this, knowing their community. It is built fully public. If 
 causes friction, the private variant is a small change — but do not make it
 unilaterally.
 
-**The one unavoidable cost is $99/year to Apple**, because the App Group entitlement
-the widget requires is not available to free personal developer teams. Supabase and
-Resend both stay within free tiers at this scale. Supabase free-tier projects pause
+**There is no running cost.** The $99/year Apple fee existed only for the widget's
+App Group entitlement, and both went on 2026-11-24. GitHub Pages and Supabase both
+stay within free tiers at this scale. Supabase free-tier projects pause
 after about a week of inactivity, which twice-weekly use comfortably prevents.
 
 **Why thirty players and two sessions a week matters.** Roughly 300 rated games a

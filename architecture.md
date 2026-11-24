@@ -1,32 +1,38 @@
 # Architecture — Badminton Club Ladder
 
 A map of the whole system: what each piece is, why it is shaped that way, and how the
-pieces reach each other. Written against the repository as of **2026-11-04**.
+pieces reach each other. Written against the repository as of **2026-11-24**.
 
 Companion documents:
 
 - `CLAUDE.md` — the hard rules and the append-only Decision Log. Takes precedence.
-- `docs/SPEC.md` — the agreed specification and the 74 user stories.
-- `docs/BACKEND.md` — the operational view of the database and functions.
+- `docs/SPEC.md` — the agreed specification and its user stories.
+- `docs/APP.md` and `docs/BACKEND.md` — the operational view of the client and the
+  backend.
 - `manual.md` — how to actually run all of this, step by step.
 
 ---
 
 ## 1. What the system is
 
-A free iOS app for one badminton club of about thirty people who play doubles twice
-every weekend, roughly 300 rated games a month.
+A free web app for one badminton club of about thirty people who play doubles twice
+every weekend, roughly 300 rated games a month. Each player adds it to their phone's
+home screen, where it opens full-screen like an app. It is hosted on GitHub Pages.
 
 The loop is four steps:
 
 1. A player finishes a doubles game and **logs** it: four names, two per side, a score.
-2. The other three get a push notification and **confirm** with one tap.
+2. The other three get a push notification and **confirm** it.
 3. Once all four have agreed, an **OpenSkill rating moves** for all four.
-4. A home-screen **widget** shows the top five men, the top five women, and the
-   viewer's own rank.
+4. The home-screen icon opens straight onto the **ladder**.
 
 Because every game carries all four names publicly and needs their agreement, the
-record polices itself. There is no referee role and no moderation queue.
+record polices itself. There is no referee role; an admin steps in only for disputes,
+mistakes and lost passwords.
+
+Until 2026-11-24 this was an iOS app with a home-screen widget, distributed through
+TestFlight. The widget needed a $99/year Apple membership, and the author chose a free
+web app instead; the Decision Log records the move.
 
 ---
 
@@ -85,19 +91,18 @@ domain source for forbidden imports.
 
 | Layer | Choice | Why this one |
 |---|---|---|
-| App | Expo + React Native, TypeScript, **iOS only** | One developer, one platform, no native build tooling to maintain. |
+| App | Expo + React Native, TypeScript, rendered to the web by `react-native-web` | The screens were already React Native; Expo exports them as a static site with no rewrite. |
+| Hosting | GitHub Pages, built by GitHub Actions | Free, and a static site is all the client is. Pages runs no code, so everything server-side stays in Supabase. |
 | Rating model | `openskill.js`, Plackett-Luce | Elo is a 1v1 model bent into doubles by averaging and carries no notion of uncertainty, which matters enormously when newbies and strong players share one pool. TrueSkill is the same model family but patented for commercial use. |
-| Backend | Supabase free tier | Postgres + Auth + Realtime + Edge Functions in one free box. Row-level security is the whole trust model. |
+| Backend | Supabase free tier | Postgres + Auth + Storage + Edge Functions in one free box. Row-level security is the whole trust model. |
 | Server runtime | Supabase Edge Functions (Deno 2) | Can import the TypeScript domain core *directly*, so the rating engine that runs in production is literally the one the tests exercise. |
-| Auth email | Resend as custom SMTP | Supabase's built-in mailer is rate-limited to a trickle. A password reset that silently never arrives is how a community quietly stops using an app. |
+| Sign-in | Username and password only | The author's call, for simplicity. No email is ever sent, so there is no mail provider; an admin resets a forgotten password. |
+| Notifications | Web Push, signed and encrypted by `web-push` | The standard that iPhone supports for home-screen web apps since iOS 16.4. The crypto is exactly the code not to hand-roll. |
 | Client cache | `@tanstack/react-query` | Server state with invalidation, instead of hand-rolled loading flags in every screen. |
-| Session storage | `@react-native-async-storage/async-storage` | So a member stays signed in between weekends. |
-| Widget | Swift / WidgetKit via `expo-apple-targets`, App Group | **Not built yet.** A widget cannot hold a session token, so it renders a payload the host app writes into a shared container. |
-| Distribution | TestFlight only | Closed community, invite only. Not the public App Store. |
+| Session storage | `@react-native-async-storage/async-storage` | localStorage on the web, so a member stays signed in between weekends. |
 
-The only running cost is **$99/year to Apple**, because the App Group entitlement the
-widget needs is unavailable to free personal developer teams. Supabase and Resend both
-stay inside free tiers at this scale.
+There is **no running cost.** GitHub Pages and Supabase's free tier cover a club of
+thirty.
 
 ---
 
@@ -105,49 +110,63 @@ stay inside free tiers at this scale.
 
 ```
 CLAUDE.md                  hard rules + append-only Decision Log  (the contract)
-docs/SPEC.md               the agreed spec, 74 user stories
-docs/BACKEND.md            operational notes for the backend
+docs/SPEC.md               the agreed spec and its user stories
+docs/APP.md                the client, operationally
+docs/BACKEND.md            the backend, operationally
 architecture.md            this file
 manual.md                  how to run it
 
-app.json                   Expo config: scheme, bundle id, plugins, dark only
+app.json                   Expo config: web only, baseUrl /BadmiGo, dark only
 tsconfig.json              strict, noUnusedLocals, allowImportingTsExtensions
 vitest.config.ts           scopes test collection to src/** (see 4.1)
-.env.example               EXPO_PUBLIC_* for the phone
+.env.example               the three EXPO_PUBLIC_* values the build inlines
+.github/workflows/pages.yml  typecheck, test, export, publish to GitHub Pages
+
+public/                    COPIED INTO THE SITE AS-IS
+  index.html               the HTML template: manifest, touch icon, iPhone meta tags
+  manifest.json            standalone display, start URL on the ladder
+  sw.js                    the service worker: shows a push, opens its screen
+  icon-192.png, icon-512.png, apple-touch-icon.png
 
 app/                       THE ROUTES — expo-router, file-based
   _layout.tsx              providers + the auth gate (Stack.Protected)
-  (tabs)/_layout.tsx       the four tabs
+  (tabs)/_layout.tsx       the five tabs
   (tabs)/index.tsx         the ladder
   (tabs)/feed.tsx          every confirmed game, club-wide
-  (tabs)/log.tsx           log a game, with the live rating preview
+  (tabs)/log.tsx           log a game, with the live rating preview and a photo
   (tabs)/me.tsx            my profile
-  game/[id].tsx            one game in full, and the confirm/dispute buttons
+  (tabs)/settings.tsx      notifications, change password, sign out, admin link
+  game/[id].tsx            one game in full; confirm/dispute; admin fixes
   player/[id].tsx          anyone's profile
-  sign-in.tsx              username-or-email, Google, Apple
+  admin/index.tsx          admin only: flagged games and the member list
+  admin/[id].tsx           admin only: seed tier, admin rights, password, merge
+  sign-in.tsx              username and password, and the install hint
   sign-up.tsx              create an account
   create-profile.tsx       the account-to-member step
-  reset-password.tsx       story 5
-  settings.tsx             notification preferences, change password, sign out
 
 src/domain/                THE PURE CORE — no I/O, no clock, no randomness
-  types.ts                 ProfileId, GameFormat, Side, Tier
+  types.ts                 ProfileId, GameFormat, GAME_FORMATS, Side, Tier
   rating-scale.ts          every tunable rating parameter, in one file
   rating.ts                replayRatings() — the one way a rating is produced
   rating-preview.ts        the untrusted pre-submit preview
   game-lifecycle.ts        (state, event) -> state reducer
   validation.ts            badminton score validity, side shape
   stats.ts                 win/loss, partners, head-to-head, PvE
-  *.test.ts                172 tests, all behaviour-through-the-interface
-  purity.test.ts           enforces "the domain imports nothing"
+  flags.ts                 which games an admin should look at
+  recap.ts                 what a player's week came to
+  overtaken.ts             who a replay moved past whom
+  *.test.ts                behaviour through the interface
+  purity.test.ts           enforces "the domain imports nothing, reads no clock"
 
 src/data/                  THE ONLY MODULE THAT TALKS TO SUPABASE
-  client.ts                the single Supabase client + unwrap()
+  client.ts                the single Supabase client, unwrap(), invoke()
+  function-contract.ts     what the app and Edge Functions share; domain types only
   database.types.ts        GENERATED by `npm run types:db` — never hand-edit
   auth.ts                  sign in/up/out, username rules, create_my_profile
-  games.ts                 log_game, confirm-game, the feed queries
+  games.ts                 log_game (with photo upload), confirm-game, the feed queries
   ladder.ts                player_ratings, rating_history, player search
-  notifications.ts         push tokens, notification preferences
+  notifications.ts         push subscribe/unsubscribe, notification preferences
+  admin.ts                 the admin function, members, appointing admins
 
 src/ui/                    FORMATTING, STATE AND COMPONENTS — no rules
   theme.ts                 one dark palette, spacing, type scale, layout
@@ -157,33 +176,35 @@ src/ui/                    FORMATTING, STATE AND COMPONENTS — no rules
   game-row.ts              unpacking a feed row the way screens need it
   player-stats.ts          assembling one player's stats from the domain
   player-profile.tsx       the profile body, shared by /me and /player/[id]
-  components/
-    async.tsx              Pending / Problem / Nothing — the three states
-    badge.tsx              TierBadge, PlacementBadge, StatusChip
-    button.tsx             Button, ButtonRow
-    field.tsx              Field (text) and Choice (segmented)
-    game-card.tsx          one game as it appears in a feed
-    pending-banner.tsx     "you owe three answers", on opening the app
-    player-picker.tsx      search + recents, excluding who is already chosen
-    rating-graph.tsx       the rating line, drawn with react-native-svg
+  standing.ts              your rank and the gap to the player above
+  components/              async states, badges, buttons, fields, game card,
+                           pending banner, player picker (with invite), podium,
+                           rating graph, standing card, photo picker,
+                           install hint, admin game panel
 
 src/simulation/            A TEST OF THE PREMISE, NOT THE CODE
   club.ts                  30 synthetic players with known true skill
   recovery.test.ts         does the engine recover a ranking it was never told?
 
 scripts/smoke.ts           the ONE end-to-end check against a local stack
+scripts/smoke-client.ts    its plumbing: local keys, one HTTP helper, registering
 
 supabase/
-  config.toml              auth providers, Resend SMTP, per-function settings
-  .env.example             secrets the CLI substitutes into config.toml
-  migrations/              the schema, seven files, applied in order
+  config.toml              auth settings, per-function settings
+  migrations/              the schema, applied in filename order
   functions/
-    _shared/supabase.ts    client factories + json() helper
+    deno.json              the functions' imports: supabase-js, openskill, web-push
+    .env.example           the VAPID keys the functions read
+    _shared/supabase.ts    client factories, required(), json()
     _shared/game-state.ts  read -> reduce -> compare-and-set, with retry
+    _shared/push.ts        the one Web Push sender, preferences respected
+    _shared/replay-input.ts  narrowing replay_input()'s json
     confirm-game/          a participant's answer
-    replay-ratings/        rebuild every rating from history
+    admin/                 corrections, void, resolve, seed tier, merge, password
+    replay-ratings/        rebuild every rating; "passed you" pushes
     auto-accept/           hourly sweep of the 24-hour window
-    notify-players/        all three pushes behind one `kind`
+    weekly-recap/          Sunday evening, each player's week
+    notify-players/        the push for one game, behind one `kind`
 ```
 
 Nothing is over 300 lines.
@@ -361,11 +382,36 @@ holds it to the replay's own output on the same fixture — which is the single
 highest-value test in the repository, because it makes hard rule 3 cheap to keep
 rather than a thing you have to remember.
 
+### 5.7 `flags.ts`, `recap.ts`, `overtaken.ts` — what the notifications and admin read
+
+Three small pure functions added on 2026-11-24, each answering one question for a
+server function or a screen, so that the answer is tested here rather than buried in
+I/O code:
+
+- **`flagFor(game)`** — why an admin should look at a game (story 70): `disputed`, or
+  `nobody-answered` when the 24-hour clock accepted it and no one but the logger ever
+  answered inside the window. It reads `AUTO_ACCEPT_MS` from the lifecycle rather than
+  restating it. Scores are not second-guessed. A game carries at most one flag, or
+  null.
+- **`recapFor(...)`** — a player's games, wins, and rating from first to last over
+  whichever games the caller chose as the week (story 62), read from the replay's own
+  per-game changes, never recomputed. Null for a player with none, so nobody is sent a
+  recap of nothing.
+- **`overtaken(before, after)`** — who a replay moved past whom (story 63). It decides
+  who is ranked itself (active and out of placement), so the Edge Function only passes
+  rows in. Only players ranked on both sides count: someone finishing placement above
+  you has arrived, not passed you. Ties break by profile id, the replay's own order.
+
+`types.ts` also holds the club's fixed lists, `GAME_FORMATS` and `TIERS`, with
+`asGameFormat` and `asTier` to narrow a value from the database or a request body.
+Everything that needs either list imports it from here, the Edge Functions included.
+
 ---
 
 ## 6. The database
 
-Seven migrations, applied in filename order.
+The migrations, applied in filename order. The ones dated 2026-11-24 changed some of
+what is described below, and are named where they did.
 
 ### 6.1 Enums — the club's vocabulary (`...120000_vocabulary.sql`)
 
@@ -428,14 +474,14 @@ email is derived from it (section 8).
 games
   id             uuid pk
   logger_id      -> profiles (on delete restrict)
-  format         smallint, in (11,15,21)
-  score_a/_b     smallint, 0..30, must differ
+  format         smallint, in (11,15,21,31)       (31 added by ...format_31.sql)
+  score_a/_b     smallint, 0..40, must differ
   winning_side   GENERATED ALWAYS AS (score_a > score_b ? 'a' : 'b') STORED
   played_at      timestamptz default now()   <- the replay's ordering
   created_at     timestamptz default now()   <- the auto-accept clock
   status         game_status default 'pending'
   void_reason    text   -- present exactly when status = 'voided'
-  photo_path     text   -- optional memento; no bucket exists yet
+  photo_path     text   -- optional memento, must sit in the logger's own folder
 
 game_participants   (game_id, profile_id) pk, side
 game_confirmations  (game_id, profile_id) pk, state, responded_at
@@ -454,8 +500,7 @@ bearing:
 - `(game_id) -> games` is the *same truth stated directly*, and it exists so PostgREST
   can follow it. PostgREST only traverses declared relationships and cannot see this
   one through the composite pair, so without it you could not ask for a game and its
-  answers in one query. (See section 15.1 — this relationship is currently missing from
-  the generated types, which is a live bug.)
+  answers in one query.
 
 **Shape is enforced by deferred constraint triggers.** `assert_game_shape()` checks
 exactly two players per side and exactly four confirmation rows. It is `deferrable
@@ -499,36 +544,51 @@ Two `security definer` functions, both `service_role` only:
   milliseconds, as the domain takes them.
 - **`apply_replay(ratings, history, duration_ms)`** replaces the derived tables in one
   transaction, because supabase-js cannot open one and a half-written ladder is worse
-  than a stale one.
+  than a stale one. It takes an advisory lock first (`...130100_replay_lock.sql`), so
+  two replays started in the same second queue instead of colliding on
+  `rating_history`'s keys. It returns the ladder it replaced, read under that lock, so
+  the "you were passed" comparison never sees the same old ladder twice.
 
-### 6.5 Notifications (`...120400_notifications.sql`)
+### 6.5 Notifications (`...120400_notifications.sql`, `...130200_web_push.sql`)
 
-`push_tokens` (token pk, profile_id, updated_at) and `notification_preferences`
-(confirmation_requests, dispute_alerts, weekly_recap, overtaken_on_ladder). Neither is
-in the spec's data model — they were added because stories 22, 25 and 61–64 need
-somewhere to live, and that is recorded in the Decision Log.
+`push_subscriptions` (endpoint pk, p256dh, auth, profile_id, updated_at) and
+`notification_preferences` (confirmation_requests, dispute_alerts, weekly_recap,
+overtaken_on_ladder). Neither is in the spec's original data model — they were added
+because stories 22, 25 and 61–64 need somewhere to live, and that is recorded in the
+Decision Log. A Web Push subscription is an endpoint plus the two keys a message is
+encrypted to; it replaced the native app's single `push_tokens` token on 2026-11-24.
 
 `overtaken_on_ladder` defaults to **false**, per story 63: a player who finds
 competition stressful should never be needled by an app they did not ask to be needled
 by.
 
-A push token is private to its owner — the club may read the ladder, not each other's
-push addresses. The update policy uses `using (true)` so that claiming a token already
-on file is how a shared handset switches owner; it can still only ever point at the
-caller, and tokens are unreadable, so there is nothing to redirect blindly.
+A subscription is private to its owner — the club may read the ladder, not each
+other's push addresses. The update policy uses `using (true)` so that claiming an
+endpoint already on file is how a shared phone switches owner; it can still only ever
+point at the caller, and endpoints are unreadable, so there is nothing to redirect
+blindly.
 
 `current_role_name()` lives here: it returns `anon`, `authenticated` or `service_role`,
-and `notify-players` needs it to tell its two kinds of caller apart.
+and `notify-players`, `auto-accept` and `weekly-recap` use it to tell their callers
+apart.
+
+### 6.5a Photos (`...130400_game_photos.sql`)
+
+A private `game-photos` storage bucket, JPEG only, 512 KB per file. Club members read
+every photo; a member uploads only into a folder named after their own id; and a
+`games` insert trigger insists `photo_path` sits in the logger's folder, because
+`log_game` takes the path from the client. It is checked on insert only, not as a
+table constraint, because a merge moves a game to the kept account while the photo
+stays in the duplicate's folder.
 
 ### 6.6 The RPCs (`...120500_rpc.sql`, `...120600_game_state.sql`)
 
 These hold **no rules the domain owns.** What they hold is the atomicity supabase-js
 cannot express, because a client cannot open a transaction and a game is nine rows.
 
-**`create_my_profile(username, display_name, gender, seed_tier)`** — completes signup.
-Called once per account by every route in, so there is a single path to membership. It
-reads the handle back out of the auth email rather than trusting its argument when the
-address is synthetic (section 8).
+**`create_my_profile(display_name, gender, seed_tier)`** — completes signup. It reads
+the username out of the account's synthetic auth email and refuses any other account
+(section 8; `...130000_username_only.sql`).
 
 **`username_available(text)`** — `username_problem` is null *and* nobody holds it.
 
@@ -551,55 +611,68 @@ other's row back to what they saw. On a mismatch it raises `serialization_failur
 It writes the game row and the confirmation rows **together**, so a reader can never
 catch a game marked confirmed with a participant still pending. `responded_at` uses
 `coalesce(existing, now())`, so re-persisting a state cannot move someone's original
-answer timestamp.
+answer timestamp. (That is also what lets `src/domain/flags` tell an answer a player
+gave from one the 24-hour clock filled in.)
+
+**`merge_profiles(keep, merge)`** (`...130300_merge_profiles.sql`) — story 69, service
+role only. Refuses if both accounts played in the same game; otherwise moves the
+duplicate's participant rows, answers and logged games to the kept account, then
+deletes the duplicate's auth account, whose cascade takes the profile with it, all in
+one transaction, so a failure can never leave a login without a profile. The deferred
+shape triggers judge the result at commit.
 
 ### 6.7 The trust model, in one table
 
-What a phone may write: **its own profile fields, and its own push token.** That is
-all. Everything else is an RPC or a function.
+What a browser may write: **its own profile fields, its own push subscriptions, and a
+photo in its own folder.** An admin may also set `is_admin` on another profile. That
+is all. Everything else is an RPC or a function.
 
 | Route | Who may call it | What it does |
 |---|---|---|
 | `username_problem` / `username_available` | anyone | instant signup feedback |
-| `create_my_profile` | any signed-in account | turns an account into a club member |
+| `create_my_profile` | a signed-in username account | turns an account into a club member |
 | `log_game` | a club member | a game, 4 participants, 4 confirmations, atomically |
 | `confirm-game` | a participant | confirm / dispute / cancel, then replay |
+| `admin` | an admin (checked by the function) | correct, void, resolve, seed tier, merge, password |
 | `replay-ratings` | service role only | rebuild every rating from history |
 | `auto-accept` | service role only, hourly | sweep games past 24 hours |
+| `weekly-recap` | service role only, weekly | each player's week, as a push |
 | `notify-players` | service role, or a participant of that game | the push for one game |
 | `persist_game_state` | service role only | record a lifecycle decision |
+| `merge_profiles` | service role only | move a duplicate's games to the kept account |
 | `replay_input` / `apply_replay` | service role only | read / write the derived tables |
 
 `games`, `game_participants`, `game_confirmations` and all three derived tables are
 `select`-only for `authenticated` and revoked entirely from `anon`.
 
-Story 74 — *"ratings cannot be computed or altered from a phone"* — is therefore a
+Story 74 — *"ratings cannot be computed or altered from a browser"* — is therefore a
 property of the **grants**, not of the client code. `scripts/smoke.ts` asserts it
 directly: a member cannot write a rating, cannot insert a game outside `log_game`,
-and cannot make themselves an admin.
+cannot make themselves an admin, and is refused by the `admin` function.
 
 ---
 
-## 7. The server: four Edge Functions
+## 7. The server: six Edge Functions
 
-All four run on Deno and **import the domain core directly** from `../../../src/domain/`.
+All six run on Deno and **import the domain core directly** from `../../../src/domain/`.
 That is why relative imports inside `src/domain` carry explicit `.ts` extensions: it is
 the only way a Deno Edge Function can resolve them, and the edge runtime does not
 honour Deno's `sloppy-imports`. It means the engine that rates your Saturday game is
-the exact file the 172 tests exercise — not a port of it.
+the exact file the tests exercise — not a port of it.
 
 `_shared/supabase.ts` offers two client factories, and which one a function uses *is*
 its authorization model:
 
-- **`serviceClient()`** — full privilege. Used by `confirm-game` and `notify-players`,
-  which must act on behalf of a member who is not allowed to do the thing themselves.
+- **`serviceClient()`** — full privilege. Used by `confirm-game`, `admin` and
+  `notify-players`, which must act on behalf of a member who is not allowed to do the
+  thing themselves, and so check the caller first.
 - **`callerClient(authorization)`** — anon key plus the caller's own bearer token, so
-  **the database decides** what the caller may do. Used by `replay-ratings` and
-  `auto-accept`. Because the privileged work is granted to `service_role` alone, these
-  two functions do not re-implement the permission check and *cannot forget to*. A club
-  member with a perfectly valid token gets a 403 from Postgres.
+  **the database decides** what the caller may do. Used by `replay-ratings`,
+  `auto-accept` and `weekly-recap`. Because the privileged work is granted to
+  `service_role` alone, these functions do not re-implement the permission check and
+  *cannot forget to*. A club member with a perfectly valid token gets a 403.
 
-`_shared/game-state.ts` is the read-reduce-write loop, used by two functions:
+`_shared/game-state.ts` is the read-reduce-write loop, used by three functions:
 
 ```
 read game + confirmations  ->  applyEvent(state, event)  ->  persist_game_state(...)
@@ -610,6 +683,10 @@ read game + confirmations  ->  applyEvent(state, event)  ->  persist_game_state(
 
 Three attempts is enough for two participants answering at the same instant; a third
 collision is a real queue and is reported as such.
+
+`_shared/push.ts` is the one Web Push sender. It keeps only the recipients whose switch
+for that kind is on, sends to every phone they subscribed, and deletes a subscription
+the push service reports as gone (404, 410). One bad phone never stops the rest.
 
 ### `confirm-game` — a participant's answer
 
@@ -622,25 +699,43 @@ collision is a real queue and is reported as such.
 4. If the game is now `confirmed`, **invoke `replay-ratings`**. Replaying here rather
    than on a schedule is what makes a confirming player see the ladder change. A
    failure past this point leaves the record right and the ladder stale — which
-   `rating_replay_state` shows — so it is *reported* as `replayed: false` rather than
-   turned into a failed confirmation the client would retry.
-5. Invoke `notify-players` with `confirmed` or `dispute`.
+   `rating_replay_state` shows — so it is logged and *reported* as `replayed: false`
+   rather than turned into a failed confirmation the client would retry.
+5. If the game is now `disputed`, invoke `notify-players` with `dispute`.
 6. Return `{ status, replayed }`.
+
+### `admin` — what only an admin may do
+
+Checks the caller's `is_admin` with the service role, parses one of six actions, does
+it, and — for every action except a password reset — **invokes `replay-ratings`**
+(story 67). A refusal is a 409 carrying a sentence for the admin.
+
+| action | what it does |
+|---|---|
+| `correct-score` | validated by `src/domain/validation` against the game's own format; a voided game is not corrected |
+| `void`, `resolve` | the lifecycle reducer's own events, through `applyGameEvent` |
+| `set-seed-tier` | the start of a rating, so every rating since moves |
+| `merge` | `merge_profiles`, which also deletes the duplicate's auth account |
+| `reset-password` | a temporary password through the auth admin API; never returned or logged |
+
+Appointing an admin is not here: RLS already lets an admin set `is_admin`, and it
+moves no rating.
 
 ### `replay-ratings` — rebuild everything
 
-`replay_input()` -> `replayRatings(...)` -> `apply_replay(...)`. Always from zero.
+`replay_input()` -> `replayRatings(...)` -> `apply_replay(...)`, which hands back the
+ladder it replaced. Always from zero. Afterwards it compares the ladder before and
+after with `src/domain/overtaken` and sends the opt-in "you were passed" push. A failed
+push is logged and never fails the replay.
 
-The json crossing from Postgres is **narrowed, not asserted** — `parseSeed`,
-`parseGame`, `asPair` and friends reject anything malformed. The comment explains why
-this is worth the lines: *"A replay that quietly rated a malformed game is the one
-fault in this system that replaying history cannot undo, because history is what would
-be wrong."*
+The json crossing from Postgres is **narrowed, not asserted** (`_shared/replay-input.ts`)
+— anything malformed is rejected. *"A replay that quietly rated a malformed game is the
+one fault in this system that replaying history cannot undo, because history is what
+would be wrong."*
 
 One cast exists, `asJson`, and it is documented: the engine returns readonly
 interfaces that serialize exactly as the SQL expects, but an interface has no index
-signature so TypeScript will not call one `Json`. That cast is the entire cost of
-spelling the payload the way the engine spells it instead of translating field by field.
+signature so TypeScript will not call one `Json`.
 
 ### `auto-accept` — the hourly sweep
 
@@ -649,66 +744,63 @@ privileged call is deep inside the loop; without the early check a member would 
 500 on the one run that had a ripe game and a 200 on every other.
 
 Then: every pending game is offered an `elapse` event and **the reducer decides which
-are ripe** — the twenty-four hours stay in the domain. One replay for the whole sweep,
-then a silent push per accepted game.
+are ripe** — the twenty-four hours stay in the domain. One replay for the whole sweep.
+`replayed` in its answer is true only when a replay actually ran, because that is the
+field read out of `cron.job_run_details`.
 
-It has **no scheduler of its own**, and story 26 does not work without one. It needs
-the project ref and the service role key, so it cannot be a migration. `docs/BACKEND.md`
-holds the `cron.schedule` + `vault.create_secret` SQL to run once against production.
+### `weekly-recap` — Sunday evening
 
-### `notify-players` — all three pushes, one function
+Service role only, checked up front like `auto-accept`. Takes the last seven days of
+confirmed games from `replay_input()`, their rows from `rating_history`, and asks
+`src/domain/recap` what each player's week came to: games, wins, rating from first to
+last. A player who did not play is sent nothing.
 
-The spec called this `notify-widget`; it was built as `notify-players` carrying the
-confirmation request, the dispute alert and the silent widget wake behind one `kind`,
-because three near-identical push functions would have been worse than one.
+### `notify-players` — the push for one game
 
-| kind | audience | payload |
+| kind | audience | switch |
 |---|---|---|
-| `confirmation-request` | the three who are not the logger | visible push |
-| `dispute` | all four | visible push |
-| `confirmed` | all four | `_contentAvailable: true` — **silent**, wakes the app to reload the widget |
+| `confirmation-request` | the three who are not the logger | `confirmation_requests` |
+| `dispute` | all four | `dispute_alerts` |
 
-Preferences are respected for the two visible kinds. The silent wake deliberately
-ignores them: it carries no message, so there is nothing for a member to have turned
-off. Delivery is Expo's push service.
-
+Each message carries the path of the game, and the service worker opens it on a tap.
 Two kinds of caller: the functions that settle a game hold the service role, and a
-member whose phone just logged a game asks for the confirmation request itself — and
+member whose browser just logged a game asks for the confirmation request itself — and
 is allowed to, but only for a game they played in.
+
+Neither `auto-accept`, `admin` nor `weekly-recap` has a scheduler of its own where it
+needs one: `docs/BACKEND.md` holds the `cron.schedule` + `vault.create_secret` SQL to
+run once against production.
 
 ---
 
 ## 8. Identity and auth
 
-Three ways in — username+password, email+password, Google, Apple — and **one path to a
-profile.** No database trigger creates profiles; all four routes finish by calling
-`create_my_profile`, so there is one path to membership rather than one that works for
-two of the four.
+**Username and password, and nothing else** (since 2026-11-24). Email, Google and Apple
+sign-in were dropped for simplicity, and with them any email the app sends.
 
-Apple ships *with* Google, not after it: App Store guideline 4.8 requires an
-equivalent privacy-respecting login wherever a third-party one is offered.
+No database trigger creates profiles. Signing up makes the account; the create-profile
+screen then calls `create_my_profile`, so an account whose profile step failed can
+finish later rather than being stuck half-made.
 
 ### The synthetic email scheme
 
-Supabase authenticates by email, and a member who signs up with a username alone has
-no email. The obvious design is a username-to-email lookup — and it was rejected,
-because it would expose every member's real address to anyone who can guess a handle.
-
-Instead a username-only account's auth email is **derived** from the handle:
+Supabase authenticates by email, and a member has none. So each account's auth email
+is **derived** from the handle:
 
 ```
 hung  ->  hung@users.badminton-ladder.invalid
 ```
 
-The `.invalid` TLD is reserved by RFC 2606 and can never receive mail, which is the
-honest signal: these accounts have no email and cannot reset a password by one.
+The `.invalid` TLD is reserved by RFC 2606 and can never receive mail.
 
-Two consequences follow:
+Three consequences follow:
 
 - **Supabase Auth's own unique index on email is what actually reserves a username.**
-  `create_my_profile` reads the handle back out of the address rather than trusting its
-  argument, so the two can never disagree — which would otherwise lock the real owner
-  of a handle out permanently.
+  `create_my_profile` reads the handle back out of the address rather than taking it as
+  an argument, so the two can never disagree.
+- **`create_my_profile` refuses any account not on that domain.** Supabase Auth will
+  create an account for a real address if called directly; it can never become a
+  member.
 - **The mapping is written twice**, in `public.username_email_domain()` and in
   `src/data/auth.ts`. **Change them together or sign-in breaks.** This is the single
   most dangerous coupling in the repository.
@@ -716,9 +808,12 @@ Two consequences follow:
 Email confirmations are **off**: synthetic addresses cannot receive mail, and signup has
 to fit between games (story 8 — under thirty seconds).
 
-`[auth.rate_limit] email_sent = 30`, raised from the default of 2, because thirty
-members might each need a password reset in the same evening and the default would turn
-story 5 into "ask the admin" for everyone after the first.
+### A forgotten password
+
+An admin sets a temporary one (story 5): *club admin → the member → Temporary
+password*, through the `admin` function's `reset-password` action and the auth admin
+API. The admin tells the member in person; the member changes it in Settings. The
+function never returns or logs the password.
 
 ---
 
@@ -735,8 +830,8 @@ Two details that matter:
 - The two env vars are **spelled out literally**, not looked up by name. Expo inlines
   `process.env.EXPO_PUBLIC_*` at build time by literal substitution, so a dynamic read
   is `undefined` in a built app — it would pass every test here and fail on a phone.
-- The session lives in `AsyncStorage` so a member stays signed in. `detectSessionInUrl`
-  is off: it is a browser concern and there is no browser.
+- The session lives in `AsyncStorage` — localStorage on the web — so a member stays
+  signed in. `detectSessionInUrl` is off: no sign-in ever arrives by link.
 
 `unwrap()` turns supabase-js's two-field `{ data, error }` result into a value or a
 throw, once, in one place. The handful of readers that can legitimately return nothing
@@ -752,8 +847,8 @@ is worse than a stale copy, because the next regeneration silently reverts the e
 restated, so a change to the shape reaches the screens through the compiler.
 
 There are **no Realtime subscriptions.** No v1 story asks for a live-updating screen:
-the ladder and feed refresh on pull and on cache invalidation after an answer, and the
-widget is the ambient path. Sockets would be a second staleness model to reason about.
+the ladder and feed refresh on pull and on cache invalidation after an answer.
+Sockets would be a second staleness model to reason about.
 
 ### 9.2 `src/ui` — formatting, state and components, no rules
 
@@ -772,8 +867,8 @@ widget is the ambient path. Sockets would be a second staleness model to reason 
   cache is dropped rather than guessed at.
 - **`session.tsx`** — who is using the app, as the five states a router actually
   branches on: `loading`, `signed-out`, `needs-profile`, `member`, `unavailable`.
-  `needs-profile` is the real gap between an account and a membership — signing in with
-  Google creates the first and not the second — and modelling it explicitly is why
+  `needs-profile` is the real gap between an account and a membership — signing up
+  creates the first and the profile step the second — and modelling it explicitly is why
   there is no "is this an error or a new user?" conditional anywhere else.
 - **`game-row.ts`** — unpacking a feed row: lineup, winner, what it moved for one
   player, how many still owe an answer, how long until auto-accept. It imports
@@ -781,7 +876,7 @@ widget is the ambient path. Sockets would be a second staleness model to reason 
 - **`player-stats.ts`** — assembles one player's profile numbers by calling
   `domain/stats` over the games that player appeared in. `startOfMonth` lives here
   because "games this month" (story 54) is a presentation window, not a rule.
-- **`components/`** — eight small pieces. The one worth naming is `async.tsx`:
+- **`components/`** — small pieces. The one worth naming is `async.tsx`:
   `Pending`, `Problem` and `Nothing` are the three states every query screen has, so
   no screen hand-rolls a spinner or an error message.
 
@@ -799,23 +894,23 @@ players and two sessions a week: a half-minute of staleness is invisible"),
 loading      -> <Pending />
 unavailable  -> <Problem onRetry={retry} />
 otherwise    -> a Stack with three Stack.Protected groups:
-                  member        -> (tabs), game/[id], player/[id], settings
+                  member        -> (tabs), game/[id], player/[id]
+                                   and, guarded again by is_admin: admin/index, admin/[id]
                   needs-profile -> create-profile
-                  signed-out    -> sign-in, sign-up, reset-password
+                  signed-out    -> sign-in, sign-up
 ```
 
 It uses `Stack.Protected` **guards rather than a redirect in an effect**, so there is
-no frame in which a signed-out phone has a club member's screen mounted. Every group
+no frame in which a signed-out browser has a club member's screen mounted. Every group
 redirects to `home`, which is whichever route the *current* status belongs to — so one
 expression is the right answer for all three groups.
 
-The four tabs are Ladder, Feed, Log and Me. The ladder screen is the clearest example
+The five tabs are Ladder, Feed, Log, Me and Settings. The ladder screen is the clearest example
 of the project's division of labour: it splits the list into **ranked**, *"Finding
 their level"* (in placement) and *"Away for 21+ days"*, measuring activity from
 `last_played_at` against the current clock rather than trusting the `is_active` flag
 the last replay froze — exactly as the column comment in the schema advises. It shows
-`rating_replay_state` as *"Ratings last rebuilt 3 min ago"*, which is story 60's
-honesty about the few-minute lag.
+`rating_replay_state` as *"Updated 3 min ago"*, so a stale ladder says so.
 
 The log screen is where the domain core surfaces directly in the UI: it calls
 `validateProposedGame` on every keystroke (suppressing the score complaint while a box
@@ -828,25 +923,46 @@ survives submission so an afternoon with the same four is one score each time
 
 ---
 
-## 10. The widget — designed, not built
+## 10. Home screen, notifications, hosting
 
-Large size only in v1. The spec's eleven rows (five men, five women, the viewer's rank)
-do not fit a small or medium widget, and lock-screen widgets cannot hold them at all.
+### Home screen
 
-iOS does not let a widget poll, so three refresh paths work together:
+`public/manifest.json` (`display: standalone`, start URL `./`, which is the ladder) and
+the Apple touch icon make the site install like an app. `public/index.html` is the
+template Expo fills in; its links carry `/BadmiGo/` because a deep link such as
+`/BadmiGo/game/<id>` would resolve a relative path under `/game/`.
 
-1. A timeline refresh roughly hourly, as the floor.
-2. `reloadAllTimelines()` when the app is foregrounded, so the logger sees their own
-   change immediately.
-3. A **silent background push** (`content-available`) to the other participants when a
-   game becomes confirmed, waking their app long enough to reload. That is the
-   `confirmed` kind in `notify-players`, and it is already implemented server-side.
+Safari has no install button, so `InstallHint` shows the steps on the sign-in screen
+and in Settings, but only on an iPhone that has the app open in a Safari tab
+(`needsHomeScreenInstall()` in `src/data/notifications.ts`).
 
-The widget **renders a payload the host app writes into the App Group container.** It
-does not query Supabase and does not hold a session token.
+### Notifications
 
-The UI states "ranks update within a few minutes" (story 60). Chasing true realtime on
-an iOS widget is not winnable and is not attempted.
+```
+Settings switch (a tap)  ->  Notification.requestPermission()
+                         ->  register /BadmiGo/sw.js
+                         ->  pushManager.subscribe(VAPID public key)
+                         ->  upsert push_subscriptions (endpoint, p256dh, auth)
+
+server: _shared/push.ts  ->  web-push signs (VAPID) + encrypts (aes128gcm)
+                         ->  Apple / Google / Mozilla push service  ->  phone
+sw.js 'push'             ->  showNotification(title, body)
+sw.js 'notificationclick' -> open or focus the app at the message's path
+```
+
+On an iPhone this only works for a home-screen web app, on iOS 16.4 or later, and the
+permission prompt must come from a tap — which is why it lives behind a switch rather
+than appearing on launch. iPhone shows every web push, so there is no silent push; the
+widget's silent wake went with the widget. Signing out unsubscribes the phone first.
+
+### Hosting
+
+`.github/workflows/pages.yml` runs on every push to `main`: `npm ci`, typecheck, the
+tests, `npm run export:web`, publish `dist/`. The three `EXPO_PUBLIC_*` values come
+from repository *variables*, not secrets, because they are public in the bundle anyway.
+
+GitHub Pages has no rewrite rules, so `export:web` copies `index.html` to `404.html`:
+any unknown path is served the app, and the router resolves it.
 
 ---
 
@@ -855,10 +971,11 @@ an iOS widget is not winnable and is not attempted.
 ### Logging and confirming a game
 
 ```
-PHONE                     POSTGRES                    EDGE                 EXPO
+BROWSER                   POSTGRES                    EDGE               PUSH SERVICE
   |
   | validateProposedGame()            (src/domain/validation — client-side, instant)
   | previewGame()                     (src/domain/rating-preview — untrusted)
+  | photo? shrink, upload to game-photos/<me>/...
   |
   |--- rpc log_game ------->|
   |                         | 1 txn: game + 4 participants + 4 confirmations
@@ -866,9 +983,9 @@ PHONE                     POSTGRES                    EDGE                 EXPO
   |<---- game uuid ---------|
   |
   |--- invoke notify-players {kind: confirmation-request} -->|
-  |                                                          |--- push x3 -->|
+  |                                                          |--- web push x3 -->|
   |
-  :  ... the other three tap confirm ...
+  :  ... the other three tap the notification, then confirm ...
   |
   |--- invoke confirm-game {gameId, answer} ---------------->|
   |                         |<-- read game + confirmations --|
@@ -880,9 +997,9 @@ PHONE                     POSTGRES                    EDGE                 EXPO
   |                         |<-- replay_input() -------------|  invoke replay-ratings
   |                         |                                |  replayRatings(...)
   |                         |<-- apply_replay() -------------|  (whole ladder, from zero)
-  |                         |
+  |                         |                                |  overtaken(before, after)
+  |                         |                                |--- "passed you" (opt-in) -->|
   |<-- {status, replayed} --|
-  |                                                          |--- silent push x4 -->|
   | replayed === true -> drop the entire react-query cache
 ```
 
@@ -890,30 +1007,35 @@ PHONE                     POSTGRES                    EDGE                 EXPO
 
 `pg_cron` fires hourly (`7 * * * *`) with the service role key from Vault ->
 `auto-accept` -> every pending game is offered `elapse` -> the reducer accepts only
-those past exactly 24 hours from `created_at` -> one replay for the whole sweep -> a
-silent push per accepted game.
+those past exactly 24 hours from `created_at` -> one replay for the whole sweep. The
+admin's review list then flags any such game where nobody but the logger ever answered
+(`src/domain/flags`).
 
 ### Signing up
 
 ```
-username only:  signUp("hung")  ->  hung@users.badminton-ladder.invalid
-email:          signUp("me@x.com")  ->  me@x.com
-Google / Apple: signInWithIdToken(provider, token)
+signUp("hung", password)  ->  auth account hung@users.badminton-ladder.invalid
                           |
                           v
-            all four -> create_my_profile(username, display_name, gender, seed_tier)
+       create_my_profile(display_name, gender, seed_tier)
                           |
                           +-> profiles row            (membership begins here)
                           +-> notification_preferences row
 ```
 
-### An admin corrects a score (design, not built)
+### An admin corrects a score
 
-Edit the game -> replay. Story 67 requires the recomputation to be automatic. The
-pieces exist — the reducer has `void` and `resolve`, `persist_game_state` and
-`replay-ratings` exist, `is_admin()` guards the privileged columns — but the functions
-that drive them are not written. **Until they are, an admin edit to `seed_tier` leaves
-every rating stale** until a replay runs. `rating_replay_state` is how you tell.
+```
+game screen (admin panel)  ->  validateScore() in the browser, for instant feedback
+                           ->  invoke admin {action: correct-score}
+admin function             ->  is_admin? -> validateScore() again, against the stored format
+                           ->  update games set score_a, score_b
+                           ->  invoke replay-ratings   (story 67: automatic)
+browser                    ->  drop the entire react-query cache
+```
+
+Voiding, resolving a dispute, changing a seed tier and merging accounts take the same
+path. None of them writes a rating; each changes what the replay reads.
 
 ---
 
@@ -921,7 +1043,7 @@ every rating stale** until a replay runs. `rating_replay_state` is how you tell.
 
 ### The seam
 
-**One seam: the pure domain core.** 172 tests across 8 files, all of them asserting
+**One seam: the pure domain core.** 214 tests across 13 files, all of them asserting
 observable behaviour through a module's public interface. Not one asserts that
 `openskill.rate` was called, reaches into an intermediate value, or snapshot-tests a
 blob of floats.
@@ -940,7 +1062,9 @@ inflating sigma; margin of victory having no effect; determinism; every lifecycl
 transition and every invalid one; the 24-hour boundary; a single dispute freezing a
 game regardless of other confirmations; valid and invalid scores for all three formats;
 partner breakdown and head-to-head against hand-computed fixtures; PvE near zero for a
-player who performs exactly as predicted, and unmovable by their own rating.
+player who performs exactly as predicted, and unmovable by their own rating; the admin
+flags, including an answer one millisecond inside the 24-hour window; the weekly recap
+over a window; and who passed whom, ties included.
 
 ### The simulation harness
 
@@ -983,55 +1107,57 @@ parameters without running it and reporting the before/after.
 **wiring**, not the rules: row-level security, the grants, the atomic writes, and
 whether a Deno function can reach the domain core at all. Four members register, the
 two newbies beat the two strongest, three confirm, and the derived tables are checked —
-including the three things that are *configuration* rather than code and would
-therefore break silently: a phone cannot write a rating, cannot invent a game, cannot
-make itself an admin.
+including the things that are *configuration* rather than code and would therefore
+break silently: a browser cannot write a rating, cannot invent a game, cannot make
+itself an admin. Then an admin corrects the score and the replay follows by itself, a
+temporary password works, a merged duplicate can no longer sign in, and an account
+made with a real email cannot join.
 
 ---
 
 ## 13. Configuration and secrets
 
-### `.env` (repo root) — baked into the app bundle
+### `.env` (repo root) — baked into the app's JavaScript
 
 ```
 EXPO_PUBLIC_SUPABASE_URL
 EXPO_PUBLIC_SUPABASE_ANON_KEY
+EXPO_PUBLIC_VAPID_PUBLIC_KEY
 ```
 
-Expo inlines anything prefixed `EXPO_PUBLIC_` into the bundle, so **only ever put the
-anon key here.** It is public by design; row-level security is what protects the data.
-The service role key must never appear in this file.
+Expo inlines anything prefixed `EXPO_PUBLIC_` into the bundle, so **only public values
+go here.** The anon key is public by design; row-level security is what protects the
+data. The service role key and the VAPID private key must never appear in this file.
+For the live site the same three are GitHub repository variables (manual Part 11).
 
-### `supabase/.env` — substituted into `config.toml` by the CLI
+### `supabase/functions/.env` — read by the Edge Functions
 
 ```
-RESEND_SMTP_PASSWORD                      a Resend API key; the user is literally "resend"
-AUTH_SENDER_EMAIL                         on a domain verified with Resend
-SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID    the iOS bundle id, com.pvqh.badmintonladder
-SUPABASE_AUTH_EXTERNAL_APPLE_SECRET       the client-secret JWT (web OAuth flow only)
-SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID   EVERY client that may present an ID token,
-                                          iOS and web, comma-separated
-SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET
+VAPID_SUBJECT       mailto: an address push services can contact
+VAPID_PUBLIC_KEY    the same public key as above
+VAPID_PRIVATE_KEY   never anywhere else
 ```
 
-Placeholders are fine locally: email confirmations are off, so only a password reset
-sends mail at all.
+Locally the runtime reads this file. In production the same values are set with
+`npx supabase secrets set`. **Changing the pair** turns notifications off on every
+phone until each member switches them on again.
 
-Auth providers are configured **in `config.toml` rather than in the dashboard** so the
-setting is reviewed in git and cannot be forgotten on a project rebuild.
-`skip_nonce_check = true` for Google because the native Google sign-in library does not
-return the nonce it signed. Apple has `email_optional = true` because Sign in with
-Apple can withhold the address behind a relay and a member who hides it still gets a
-profile.
+### `supabase/config.toml`
+
+Committed, and read by `supabase start` and `supabase config push`. It reads no
+environment variables any more. Worth knowing: `site_url` is the GitHub Pages address,
+with `http://localhost:8081` allowed as well; email confirmations are off; no external
+OAuth provider is enabled; and every function is `verify_jwt = true`.
 
 ### Local ports
 
 | Port | What |
 |---|---|
-| 54321 | API gateway — REST, Auth, Functions |
+| 8081 | `npm run web`, the development server |
+| 54321 | API gateway — REST, Auth, Storage, Functions |
 | 54322 | Postgres |
 | 54323 | Supabase Studio |
-| 54324 | Mailpit, the local mail catcher |
+| 54324 | Mailpit (still started by the CLI; nothing sends mail) |
 | 54327 | analytics |
 | 8083 | Deno inspector for debugging functions |
 
@@ -1039,166 +1165,95 @@ profile.
 
 ## 14. What is built, and what is not
 
-**Built and working:** the entire schema with RLS; all four auth routes; `log_game`;
-the full lifecycle through `confirm-game`; `replay-ratings`; `auto-accept`;
-`notify-players`; the complete pure domain core with 172 tests; the simulation harness;
-the end-to-end smoke check; the data layer; and — as of 2026-11-04 — the full route
-tree and component set: the ladder with its men's/women's filter, the feed, the log
-flow with its live preview, the pending banner, a player profile with the rating graph,
-settings, and all four ways in.
+**Built and working:** every story in the spec. The schema with RLS and storage;
+username sign-in; `log_game`; the full lifecycle through `confirm-game`; the `admin`
+function and its screens; `replay-ratings` with the overtaken alert; `auto-accept`;
+`weekly-recap`; `notify-players` over Web Push; the complete pure domain core; the
+simulation harness; the end-to-end smoke check; and the screens: the ladder with its
+podium and men's/women's filter, the feed, the log flow with its live preview and an
+optional photo, the pending banner, profiles with the rating graph, settings, admin,
+home-screen install, and the GitHub Pages build.
 
-`npm test` is green (172) and `npm run typecheck` is clean.
+`npm test` is green (214), `npm run typecheck` is clean, and `npm run smoke` passes
+38 checks.
 
-**Deliberately not built yet**, so that what exists is finished rather than broadly
-sketched:
+**Verified only as far as a PC can:** Web Push. The server signs and encrypts a
+message (checked against a local endpoint); real delivery to an iPhone needs the live
+HTTPS site and a phone.
 
-- **Admin tooling** (stories 65–72). Correcting a score, voiding a game, adjusting a
-  seed tier, merging duplicates. All the pieces exist; the functions that drive them do
-  not. Consequence today: an admin edit to `seed_tier` leaves ratings stale.
-- **The weekly recap and the overtaken-on-ladder alert** (stories 62, 63). The
-  preferences exist and default correctly; nothing sends them.
-- **The widget**, and the payload the host app would write to the App Group.
-- **Photo storage.** `games.photo_path` is a column; no bucket and no policy exist.
-- **The hourly scheduler.** `auto-accept` works but nothing calls it. The SQL is in
-  `docs/BACKEND.md` and must be run once against production.
+**Needs doing once, outside the repository:** the hosted project, the first admin, the
+two cron schedules, and the GitHub Pages settings and variables. `manual.md` Parts
+11–12 and `docs/BACKEND.md` "Going live".
 
 **Out of scope, and not to be built opportunistically:** monetisation of any kind;
-small and medium widgets; pairing and court-rotation suggestions (the likely v2);
-sessions, organisers and groups; Android; separate singles/level/mixed ladders;
-tournaments and challenges; public App Store distribution; chat, expense splitting,
-attendance, court booking; photo as proof; guest profiles; incremental rating updates.
+home-screen widgets; offline use; pairing and court-rotation suggestions (the likely
+v2); sessions, organisers and groups; Android-specific work; separate
+singles/level/mixed ladders; tournaments and challenges; any app store, TestFlight or
+native build; chat, expense splitting, attendance, court booking; photo as proof;
+guest profiles; incremental rating updates.
 
 Each of those is in the spec's Out of Scope list for a reason that was argued through.
 `CLAUDE.md` hard rule 4.
 
 ---
 
-## 15. Known issues as of 2026-11-04
+## 15. Known issues as of 2026-11-24
 
-From a strict code-quality review of the tree at 13:05 on 2026-11-04. The repository
-was being actively edited throughout the review; four findings were resolved by the
-author while it was in progress and are listed as closed in 15.5 rather than deleted,
-so the reasoning is still on record.
+### 15.1 Closed
 
-`manual.md` section 11 has the fix sequence for what remains.
+From the 2026-11-04 review, fixed on 2026-11-24:
 
-### 15.1 Blockers
+- `.gitignore` ignored every markdown file, and `.env.example`. Both fixed; the contract
+  and the example env files are tracked.
+- `readMyPendingGames` and `readRatingHistory` claimed an order PostgREST was not giving
+  them. The first now queries `games` at the top level through an aliased embed; the
+  second sorts in the replay's own order after reading.
+- Two concurrent replays could collide on `rating_history`. `apply_replay` now takes an
+  advisory lock first.
+- `auto-accept` claimed `replayed: true` on every run, and `confirm-game` dropped replay
+  errors. Both now report and log what actually happened.
+- The purity guard missed `expo-*` packages and the system clock. Both are checked.
+- `database.types.ts` held a hand patch. It is regenerated from the migrations again.
 
-1. **`.gitignore` ends with `*.md`, so the contract is not in version control.**
-   `CLAUDE.md`, `docs/SPEC.md`, `docs/BACKEND.md`, and this file are all ignored and
-   untracked — **zero** markdown files are tracked. `CLAUDE.md` opens with "Read this
-   file and `docs/SPEC.md` before writing any code. They are the contract," and the
-   Decision Log is append-only project memory recording which numbers were measured and
-   which designs were rejected. None of it is reconstructible from the code. One
-   `git clean -xfd` and the design history is gone while every line of code survives.
+### 15.2 Open
 
-2. **`.gitignore` has `.env.example ` with a trailing space.** Git strips trailing
-   whitespace from ignore patterns, so the rule matches `.env.example` — the two example
-   files it was written to *spare*. Both are untracked, so on a clean clone the first
-   two lines of local setup (`cp .env.example .env`) fail with "no such file", and a
-   newcomer has no record of which variables exist.
+1. **Two replays can finish in the wrong order.** The lock stops them colliding, but a
+   replay that read its input before a second game was confirmed, and finishes after
+   the replay that included it, leaves the ladder one game behind until the next
+   replay. Rare at this volume, and it heals itself.
+2. **`auto-accept` spends three round-trips per pending game to re-learn "not yet".**
+   Filtering the query with `.lt('created_at', now - AUTO_ACCEPT_MS)` — importing the
+   constant from the domain — would keep the decision in the reducer while stopping it
+   from being asked forty times an hour to say no.
+3. **`logGame` ignores the result of asking for the confirmation push.** Correct as
+   best-effort — the game is logged either way and the banner is the fallback — but a
+   comment there would make it read as a decision.
+4. **Minor: `inflateSigmaForIdleTime` contradicts its own test name.**
+   `if (sigma >= SIGMA_INITIAL) return SIGMA_INITIAL` *deflates* anyone above the
+   initial. Unreachable today because OpenSkill never grows sigma.
+5. **Minor: two client clocks reach the database.** `turnOnPush` and
+   `updatePreferences` send `updated_at` from the browser's clock. A column default
+   plus a `before update` trigger would keep that rule on the server.
+6. **Minor: a newly appointed admin** sees the admin screens only after reopening the
+   app, because the session reads a member's profile once.
 
-### 15.2 Correctness
-
-5. **Two reads are silently unordered.**
-   `.order(col, { referencedTable: 'games' })` emits `games.order=…`, which sorts rows
-   *inside* a to-one embed — there is one row, so it is a no-op. The top-level order is
-   undefined. `readMyPendingGames` claims "newest first" and `readRatingHistory` claims
-   "oldest first, for the graph"; neither holds. **The rating graph will draw its points
-   in arbitrary order.**
-
-6. **Two concurrent replays collide and the second one loses.** `apply_replay` does
-   `delete from rating_history where true` then a bare insert. `player_ratings` is
-   protected by `on conflict do update`; `rating_history` is not. Under READ COMMITTED
-   two overlapping transactions each delete the rows visible to their own snapshot and
-   then insert the same `(game_id, profile_id)` keys — unique violation on the loser.
-   `confirm-game` fires a replay per confirmation, so two people confirming two
-   *different* games in the same second is an ordinary Saturday. A
-   `pg_advisory_xact_lock` at the top of `apply_replay` fixes it.
-
-7. **`auto-accept` reports `replayed: true` when it never replayed** (the trailing
-   return hardcodes it, and the replay is behind `if (accepted.length > 0)`). That is
-   the field an operator reads out of `cron.job_run_details`.
-
-8. **`confirm-game` discards the replay error** — `replayed = replay.error === null`
-   throws it away with no log line. For a system whose first hard rule is "ratings are
-   derived", a silent replay failure is the one fault you most want a breadcrumb for.
-
-### 15.3 Structure
-
-9. **`auto-accept` spends three round-trips per pending game to re-learn "not yet".**
-   Every pending game, however young, costs a read of `games`, a read of
-   `game_confirmations` and a rejected reducer call. On a Saturday evening most pending
-   games are hours from ripe. Filtering the query with
-   `.lt('created_at', now - AUTO_ACCEPT_MS)` — importing the constant from the domain —
-   keeps the decision in the reducer while stopping it from being asked forty times an
-   hour to say no. The notify loop afterwards could be a `Promise.all`; those are
-   independent.
-
-10. **The purity guard has two holes.** `src/domain/purity.test.ts` is the single
-    mechanism enforcing hard rule 2. `FORBIDDEN` matches `'expo'` and `'expo/'`, so
-    `expo-router`, `expo-constants`, `expo-linking` and `expo-status-bar` would all
-    pass. And the spec's promise that the domain takes "no dates from the system clock"
-    is unchecked — the discipline is currently perfect, so a guard costs nothing and
-    would keep it that way.
-
-11. **`notify-players` has no error boundary.** `tokensFor` and `send` both `throw`, so
-    an Expo push hiccup becomes an unhandled rejection and an opaque 500. `logGame` in
-    `src/data/games.ts` awaits that invoke and never checks `error` — correct as
-    best-effort, but worth one comment, because silently ignoring an awaited result
-    reads as an oversight rather than a decision.
-
-12. **Minor: `inflateSigmaForIdleTime` contradicts its own test name.**
-    `if (sigma >= SIGMA_INITIAL) return SIGMA_INITIAL` *deflates* anyone above the
-    initial, while the test is called "never deflates a player who is already more
-    uncertain than a newcomer" and only pins the equality case. Unreachable today
-    because OpenSkill never grows sigma, so it is a dead branch with a misleading
-    label — `Math.max(sigma, SIGMA_INITIAL)` would match the name.
-
-13. **Minor: two client clocks reach the database.** `registerDevice` and
-    `updatePreferences` send `updated_at: new Date().toISOString()` — a phone's clock,
-    in a project that went out of its way to keep `played_at` on the server's. A column
-    default plus a `before update` trigger would keep that rule in one place.
-
-### 15.4 Closed during the review
-
-Resolved by the author between 12:40 and 13:05 on 2026-11-04, recorded so the
-reasoning survives:
-
-- **`probe.ts` broke `npm run typecheck`** — a root-level scratch file of
-  deliberately-wrong assertions used to coax inferred types out of `tsc`. Deleted;
-  typecheck is now clean.
-- **Six dependencies had no Decision Log line.** Now recorded, with reasons, including
-  the `react-dom` 19.3.0 `overrides` pin that `expo-router` made necessary.
-- **`expo-router` was configured but unreachable** — plugin present, no `app/`
-  directory, `main` still `index.ts`. The whole route tree now exists and `main` is
-  `expo-router/entry`.
-- **`database.types.ts` was hand-edited.** Still true, but it is now a *recorded*
-  temporary patch: the Decision Log notes the file was stale, that it lacked
-  `game_confirmations.game_id -> games` which the migration declares and the feed
-  embeds through, and that the hand edit disappears on the next `npm run types:db` once
-  Docker is available. That makes it a known debt rather than a hidden one — the
-  remaining risk is only that the regeneration is forgotten.
-
-### 15.5 What is notably good
+### 15.3 What is notably good
 
 Worth recording so it is not accidentally refactored away:
 
 - The derived-state architecture is held **honestly**. There is no code path that
   writes a rating outside a replay, and that is enforced by grants rather than by
-  discipline.
-- `replay-ratings` and `auto-accept` running as their *caller* so the database is the
-  authorization, instead of re-checking permissions in TypeScript, is the right shape —
-  and it is why one smoke assertion can prove it.
+  discipline — admin corrections included.
+- `replay-ratings`, `auto-accept` and `weekly-recap` running as their *caller* so the
+  database is the authorization, instead of re-checking permissions in TypeScript, is
+  the right shape — and it is why one smoke assertion can prove it.
 - `persist_game_state`'s compare-and-set, with the domain reducer deciding and SQL only
   recording, is exactly the division the project claims to make.
 - No `any`, no non-null `!`, no file over 300 lines.
 - `rating-preview.test.ts` pinning the untrusted client preview to the authoritative
   replay's own output makes hard rule 3 cheap to keep rather than a thing to remember.
 - The auth gate uses `Stack.Protected` guards rather than a redirect in an effect, so
-  there is no frame in which the wrong screen is mounted. That is the harder and
-  correct choice.
+  there is no frame in which the wrong screen is mounted.
 - The ladder screen measures activity from `last_played_at` against the live clock
-  rather than trusting the `is_active` flag frozen by the last replay — it took the
-  schema comment's advice instead of the convenient column.
-- Comments say *why*. I did not find one that restates its code.
+  rather than trusting the `is_active` flag frozen by the last replay.
+- Comments say *why*.

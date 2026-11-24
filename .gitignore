@@ -40,9 +40,9 @@ yarn-error.*
 /ios
 /android
 
-# Filled-in environment files, at the root for Expo and under supabase/ for the CLI.
-# Only the .example copies are committed.
+# Filled-in environment files. Only the .example copies are committed.
 .env
-.env.example 
+!.env.example
 
-# Docs
+# Review log
+docs/REVIEW_LOGS.md

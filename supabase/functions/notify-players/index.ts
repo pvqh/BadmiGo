@@ -1,9 +1,8 @@
+import { pushEach, type Message, type Preference } from '../_shared/push.ts';
 import { callerClient, callerProfileId, json, serviceClient } from '../_shared/supabase.ts';
 import type { ServiceClient } from '../_shared/supabase.ts';
 
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
-
-const KINDS = ['confirmation-request', 'dispute', 'confirmed'] as const;
+const KINDS = ['confirmation-request', 'dispute'] as const;
 
 type Kind = (typeof KINDS)[number];
 
@@ -21,9 +20,9 @@ function parse(payload: unknown): Body | null {
 }
 
 /**
- * Delivers a game's push to the people in it. Nothing about a rating is decided here
- * and nothing is written: this reads who played, respects what each of them asked to
- * be told, and hands the rest to Expo.
+ * Delivers a game's push to the people in it. Nothing about a rating is decided here:
+ * this reads who played and hands them to the shared sender, which respects what each
+ * of them asked to be told.
  *
  * Two kinds of caller. The functions that settle a game hold the service role. A
  * member whose phone has just logged a game asks for the confirmation request
@@ -48,7 +47,7 @@ Deno.serve(async (request) => {
 
   const game = await service
     .from('games')
-    .select('logger_id, status')
+    .select('logger_id')
     .eq('id', body.gameId)
     .single();
   if (game.error !== null) return json({ error: game.error.message }, 500);
@@ -58,10 +57,13 @@ Deno.serve(async (request) => {
       ? playing.filter((profileId) => profileId !== game.data.logger_id)
       : playing;
 
-  const tokens = await tokensFor(service, audience, body.kind);
-  if (tokens.length === 0) return json({ sent: 0 });
-
-  const sent = await send(tokens, body);
+  const { preference, title, body: text } = MESSAGES[body.kind];
+  const message: Message = { title, body: text, path: `game/${body.gameId}` };
+  const sent = await pushEach(
+    service,
+    preference,
+    audience.map((profileId) => ({ profileId, message })),
+  );
   return json({ sent });
 });
 
@@ -82,66 +84,18 @@ async function authorise(
   return 'denied';
 }
 
-/**
- * A silent wake carries no message, so there is nothing for a member to have turned
- * off: the preferences cover the three notifications a phone actually shows.
- */
-async function tokensFor(
-  service: ServiceClient,
-  audience: readonly string[],
-  kind: Kind,
-): Promise<readonly string[]> {
-  let wanted = audience;
-
-  if (kind !== 'confirmed') {
-    const column = kind === 'dispute' ? 'dispute_alerts' : 'confirmation_requests';
-    const preferences = await service
-      .from('notification_preferences')
-      .select('profile_id')
-      .in('profile_id', [...audience])
-      .eq(column, true);
-    if (preferences.error !== null) throw new Error(preferences.error.message);
-    wanted = preferences.data.map((row) => row.profile_id);
-  }
-
-  if (wanted.length === 0) return [];
-
-  const tokens = await service
-    .from('push_tokens')
-    .select('token')
-    .in('profile_id', [...wanted]);
-  if (tokens.error !== null) throw new Error(tokens.error.message);
-  return tokens.data.map((row) => row.token);
-}
-
-const MESSAGES: Record<Kind, { readonly title: string; readonly body: string } | null> = {
+const MESSAGES: Record<
+  Kind,
+  { readonly preference: Preference; readonly title: string; readonly body: string }
+> = {
   'confirmation-request': {
+    preference: 'confirmation_requests',
     title: 'Confirm a game',
     body: 'Someone logged a game you played in. Tap to confirm it.',
   },
   dispute: {
+    preference: 'dispute_alerts',
     title: 'A game was disputed',
     body: 'Someone disagrees with a game you played in. Sort it out at the next session.',
   },
-  // The widget refresh the spec asks for: it wakes the app and shows nothing.
-  confirmed: null,
 };
-
-async function send(tokens: readonly string[], body: Body): Promise<number> {
-  const message = MESSAGES[body.kind];
-  const payload = tokens.map((token) => ({
-    to: token,
-    data: { gameId: body.gameId, kind: body.kind },
-    ...(message === null
-      ? { _contentAvailable: true }
-      : { title: message.title, body: message.body, sound: 'default' }),
-  }));
-
-  const response = await fetch(EXPO_PUSH_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error(`Expo push refused the batch: ${response.status}`);
-  return tokens.length;
-}

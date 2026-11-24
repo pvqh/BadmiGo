@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, ScrollView, Text, View } from 'react-native';
 import { signIn } from '../src/data/auth';
 import { Button } from '../src/ui/components/button';
 import { Field } from '../src/ui/components/field';
+import { InstallHint } from '../src/ui/components/install-hint';
 import { colour, font, layout, space } from '../src/ui/theme';
 
 export default function SignIn() {
@@ -20,24 +21,26 @@ export default function SignIn() {
         <Text style={font.title}>Badminton Ladder</Text>
         <Text style={font.dim}>Log your games. The ladder sorts itself out.</Text>
 
+        <InstallHint />
+
         <View style={{ height: space.block }} />
 
         <Field
-          autoCapitalize="none"
+          //autoCapitalize="none"
           autoCorrect={false}
           autoComplete="username"
-          label="Username or email"
+          label="Username"
           onChangeText={setHandle}
           placeholder="TrangXinhGai01"
           value={handle}
         />
         <Field
-          autoCapitalize="none"
+          //autoCapitalize="none"
           autoComplete="current-password"
           label="Password"
           onChangeText={setPassword}
           secureTextEntry
-          placeholder="••••••••••••••••"
+          placeholder="•••••••••"
           value={password}
         />
 
@@ -51,15 +54,21 @@ export default function SignIn() {
           label="Sign in"
           onPress={() => signingIn.mutate()}
         />
-
-        <View style={[layout.spread, { paddingTop: space.row }]}>
-          <Link href="/sign-up" style={font.body}>
+        <Text style={[font.dim, {textAlign: 'center'}]}>
+            Chưa có tài khoản? <Link href="/sign-up" style={{color: colour.accent}}>Tham gia ngay</Link>
+          </Text>
+        {/* <View style={{ paddingTop: space.row, gap: space.tight }}>
+          <Link href="/sign-up" style={[font.body, {fontSize: 17}]}>
             Join the club
           </Link>
-          <Link href="/reset-password" style={font.dim}>
-            Forgot your password?
-          </Link>
-        </View>
+          <Text style={font.dim}>
+            Quên mật khẩu? Hãy báo cáo với admin để được cấp lại mật khẩu. Bạn có thể tìm thấy thông tin liên hệ trong phần
+  "About" của ứng dụng.
+          </Text>
+        </View> */}
+        <Text style={[font.dim, {textAlign: 'center', paddingTop: space.row}]}>
+            Quên mật khẩu? {'\n'}Hãy báo cáo với admin để được cấp lại mật khẩu.
+          </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { readMembers, runAdminAction, setAdmin } from '../data/admin';
+import type { AdminAction } from '../data/function-contract';
 import {
   answerGame,
   logGame,
   readFeed,
   readGame,
   readGamesFor,
+  readGamesForReview,
   readMyPendingGames,
+  photoUrl,
   type Answer,
 } from '../data/games';
 import {
@@ -17,7 +21,14 @@ import {
   searchPlayers,
 } from '../data/ladder';
 import { usernameAvailable, usernameProblem } from '../data/auth';
-import { readPreferences, updatePreferences, type Preferences } from '../data/notifications';
+import {
+  pushState,
+  readPreferences,
+  turnOffPush,
+  turnOnPush,
+  updatePreferences,
+  type Preferences,
+} from '../data/notifications';
 import type { ProfileId } from '../domain/types';
 
 /**
@@ -26,7 +37,7 @@ import type { ProfileId } from '../domain/types';
  */
 export const keys = {
   profile: ['profile'] as const,
-  reserved: ['reserved-username'] as const,
+  myUsername: ['my-username'] as const,
   ladder: ['ladder'] as const,
   strengths: ['strengths'] as const,
   feed: ['feed'] as const,
@@ -39,6 +50,10 @@ export const keys = {
   search: (term: string) => ['search', term] as const,
   username: (handle: string) => ['username', handle] as const,
   preferences: (profileId: ProfileId) => ['preferences', profileId] as const,
+  push: ['push'] as const,
+  members: ['members'] as const,
+  photo: (path: string) => ['photo', path] as const,
+  review: ['review'] as const,
 };
 
 /**
@@ -120,6 +135,65 @@ export function usePreferences(profileId: ProfileId) {
   });
 }
 
+/** Whether this phone receives notifications; a property of the browser, not the member. */
+export function usePushState() {
+  return useQuery({ queryKey: keys.push, queryFn: pushState });
+}
+
+export function useSetPush(profileId: ProfileId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (on: boolean) => (on ? turnOnPush(profileId) : turnOffPush()),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.push }),
+  });
+}
+
+/** Refreshed well inside the hour the signed link lasts. */
+export function usePhotoUrl(path: string | null) {
+  return useQuery({
+    queryKey: keys.photo(path ?? ''),
+    queryFn: () => photoUrl(path ?? ''),
+    enabled: path !== null,
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+export function useMembers() {
+  return useQuery({ queryKey: keys.members, queryFn: readMembers });
+}
+
+/** A month back is as far as anyone at the club would still remember a game. */
+const REVIEW_DAYS = 30;
+
+export function useReviewGames() {
+  return useQuery({
+    queryKey: keys.review,
+    queryFn: () =>
+      readGamesForReview(new Date(Date.now() - REVIEW_DAYS * 24 * 60 * 60 * 1000).toISOString()),
+  });
+}
+
+/**
+ * Every admin action except a password reset ends in a replay that rewrites every
+ * rating, so, as after a settling answer, nothing cached survives it.
+ */
+export function useAdminAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AdminAction) => runAdminAction(body),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useSetAdmin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ profileId, isAdmin }: { profileId: ProfileId; isAdmin: boolean }) =>
+      setAdmin(profileId, isAdmin),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.members }),
+  });
+}
+
 /** A new game moves no rating, so only the pending list can have changed. */
 export function useLogGame(profileId: ProfileId) {
   const queryClient = useQueryClient();
@@ -147,6 +221,20 @@ export function useAnswerGame(profileId: ProfileId) {
       await queryClient.invalidateQueries({ queryKey: keys.pending(profileId) });
       await queryClient.invalidateQueries({ queryKey: keys.game(variables.gameId) });
     },
+  });
+}
+
+/**
+ * Story 78. One at a time through `confirm-game`, exactly as single taps would be, so
+ * replays never overlap; a failure stops the run and the ones already done stay done.
+ */
+export function useConfirmAll() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (gameIds: readonly string[]) => {
+      for (const gameId of gameIds) await answerGame(gameId, 'confirm');
+    },
+    onSettled: () => queryClient.invalidateQueries(),
   });
 }
 

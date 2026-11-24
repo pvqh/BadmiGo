@@ -7,41 +7,29 @@ export type Gender = Database['public']['Enums']['gender'];
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 
 /**
- * Mirrors public.username_email_domain(). A username-only account has no real
- * address, so its Supabase Auth email is derived from the handle rather than looked
- * up — which is what keeps every member's real email out of reach of anyone who can
- * guess a username. Change this and the SQL function together or sign-in breaks.
+ * Mirrors public.username_email_domain(). Accounts are username-only, but Supabase
+ * Auth wants an email, so each one gets an address derived from the handle that can
+ * never receive mail. Change this and the SQL function together or sign-in breaks.
  */
 const USERNAME_EMAIL_DOMAIN = 'users.badminton-ladder.invalid';
 
-/** Anything with an @ in it is already an address; anything else is a handle. */
-export function authEmailFor(usernameOrEmail: string): string {
-  const entered = usernameOrEmail.trim().toLowerCase();
-  return entered.includes('@') ? entered : `${entered}@${USERNAME_EMAIL_DOMAIN}`;
+export function authEmailFor(username: string): string {
+  return `${username.trim().toLowerCase()}@${USERNAME_EMAIL_DOMAIN}`;
 }
 
-export async function signIn(usernameOrEmail: string, password: string): Promise<void> {
+export async function signIn(username: string, password: string): Promise<void> {
   const { error } = await supabase.auth.signInWithPassword({
-    email: authEmailFor(usernameOrEmail),
+    email: authEmailFor(username),
     password,
   });
   if (error !== null) throw new Error(error.message);
 }
 
-export async function signUp(usernameOrEmail: string, password: string): Promise<void> {
+export async function signUp(username: string, password: string): Promise<void> {
   const { error } = await supabase.auth.signUp({
-    email: authEmailFor(usernameOrEmail),
+    email: authEmailFor(username),
     password,
   });
-  if (error !== null) throw new Error(error.message);
-}
-
-/** Google and Apple both hand back an identity token the app exchanges for a session. */
-export async function signInWithIdToken(
-  provider: 'google' | 'apple',
-  token: string,
-): Promise<void> {
-  const { error } = await supabase.auth.signInWithIdToken({ provider, token });
   if (error !== null) throw new Error(error.message);
 }
 
@@ -60,11 +48,6 @@ export function onAuthChange(listen: (userId: string | null) => void): () => voi
 
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
-  if (error !== null) throw new Error(error.message);
-}
-
-export async function requestPasswordReset(email: string): Promise<void> {
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
   if (error !== null) throw new Error(error.message);
 }
 
@@ -87,18 +70,16 @@ export async function usernameAvailable(username: string): Promise<boolean> {
 }
 
 /**
- * Turns a signed-in account into a club member. Every way in — username, email,
- * Google, Apple — finishes here, so there is one path to a profile.
+ * Turns a signed-in account into a club member. Separate from signUp so an account
+ * whose profile step failed can finish it later rather than being stuck half-made.
  */
 export async function createMyProfile(input: {
-  readonly username: string;
   readonly displayName: string;
   readonly gender: Gender;
   readonly seedTier: Tier;
 }): Promise<Profile> {
   return unwrap(
     await supabase.rpc('create_my_profile', {
-      p_username: input.username,
       p_display_name: input.displayName,
       p_gender: input.gender,
       p_seed_tier: input.seedTier,
@@ -107,18 +88,17 @@ export async function createMyProfile(input: {
 }
 
 /**
- * The handle a username-only account is locked to, or null when the account has a
- * real address and may still choose any free username. Mirrors the derivation inside
- * public.create_my_profile, which ignores the username it is passed for these
- * accounts precisely so the two can never disagree.
+ * The handle this account was created with, read back out of its auth email, the
+ * same way public.create_my_profile derives it, so the screen shows what the profile
+ * will actually hold.
  */
-export async function reservedUsername(): Promise<string | null> {
-  const { data } = await supabase.auth.getUser();
-  const email = data.user === null ? null : data.user.email;
-  if (email === undefined || email === null) return null;
+export async function myUsername(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error !== null) throw new Error(error.message);
 
-  const [handle, domain] = email.split('@');
-  return domain === USERNAME_EMAIL_DOMAIN ? handle : null;
+  const [handle, domain] = (data.user.email ?? '').split('@');
+  if (domain !== USERNAME_EMAIL_DOMAIN) throw new Error('this account has no username');
+  return handle;
 }
 
 /** Null while an account exists but has not finished signing up. */
