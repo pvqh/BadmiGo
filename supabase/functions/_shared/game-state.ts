@@ -7,9 +7,25 @@ import {
 } from '../../../src/domain/game-lifecycle.ts';
 import type { ServiceClient } from './supabase.ts';
 
+export type Refusal = RejectionReason | 'game-not-found' | 'contended';
+
 export type ApplyOutcome =
   | { readonly ok: true; readonly state: GameState }
-  | { readonly ok: false; readonly reason: RejectionReason | 'game-not-found' | 'contended' };
+  | { readonly ok: false; readonly reason: Refusal };
+
+/** What a phone shows for each refusal; the slugs stay the reducer's, the words are the club's. */
+export const REFUSAL_MESSAGE: Record<Refusal, string> = {
+  'not-a-participant': 'Bạn không ở trong trận này',
+  'already-responded': 'Bạn đã trả lời trận này rồi',
+  'already-confirmed': 'Trận này đã được xác nhận rồi',
+  'not-the-logger': 'Chỉ người ghi mới huỷ được trận này',
+  'not-disputed': 'Trận này không bị phản đối',
+  'auto-accept-window-open': 'Trận này chưa hết 24 giờ chờ xác nhận',
+  'game-is-frozen': 'Trận này đang bị phản đối nên tạm đóng băng',
+  'game-is-voided': 'Trận này đã bị gỡ hoặc huỷ',
+  'game-not-found': 'Không tìm thấy trận này',
+  contended: 'Có người vừa trả lời cùng lúc. Thử lại nhé.',
+};
 
 /** Enough for two participants answering at the same instant; a third is a real queue. */
 const ATTEMPTS = 3;

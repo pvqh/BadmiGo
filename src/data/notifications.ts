@@ -48,7 +48,7 @@ export async function pushState(): Promise<PushState> {
  * Asks for permission and subscribes this phone. Must run straight from a tap: iPhone
  * refuses a permission prompt that no gesture asked for.
  */
-export async function turnOnPush(profileId: string): Promise<void> {
+export async function turnOnPush(): Promise<void> {
   const key = pushKey();
   if (key === null) throw new Error('Trình duyệt này không nhận được thông báo');
   if ((await Notification.requestPermission()) !== 'granted') {
@@ -66,12 +66,10 @@ export async function turnOnPush(profileId: string): Promise<void> {
 
   // Keyed by the endpoint, so a phone that changes hands moves with its new owner
   // instead of leaving the old one's address behind.
-  const { error } = await supabase.from('push_subscriptions').upsert({
-    endpoint,
-    p256dh: keys.p256dh,
-    auth: keys.auth,
-    profile_id: profileId,
-    updated_at: new Date().toISOString(),
+  const { error } = await supabase.rpc('claim_push_subscription', {
+    p_endpoint: endpoint,
+    p_p256dh: keys.p256dh,
+    p_auth: keys.auth,
   });
   if (error !== null) throw new Error(error.message);
 }

@@ -12,6 +12,7 @@
     ],
     "web": {
       "output": "single",
+      "lang": "vi",
       "favicon": "./assets/logo.jpg"
     },
     "experiments": {

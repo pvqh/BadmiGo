@@ -156,7 +156,7 @@ export default function LogGame() {
         {logging.isSuccess && !scored ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push(`/game/${logging.data}`)}
+            onPress={() => router.push(`/game/${logging.data.gameId}`)}
             style={({ pressed }) => [layout.card, pressed ? { opacity: 0.7 } : null]}
           >
             <View style={layout.spread}>
@@ -170,6 +170,9 @@ export default function LogGame() {
               Ba người còn lại có 24 giờ để xác nhận. Chơi tiếp với bốn người này? Chỉ cần
               nhập tỉ số mới.
             </Text>
+            {logging.data.notified ? null : (
+              <Text style={font.dim}>Chưa gửi được thông báo, hãy nhắc mọi người xác nhận.</Text>
+            )}
           </Pressable>
         ) : null}
       </ScrollView>

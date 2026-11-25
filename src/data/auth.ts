@@ -139,11 +139,13 @@ export async function myUsername(): Promise<string> {
 export async function myProfile(): Promise<Profile | null> {
   const { data: session, error: authError } = await supabase.auth.getUser();
   if (authError !== null) {
-    // A network failure must not read as "no profile", or a phone that lost signal
-    // would be sent to finish signing up.
-    if (!isAuthApiError(authError) && !isAuthSessionMissingError(authError)) {
-      throw new Error(authError.message);
-    }
+    // A network failure or a busy auth server must not read as "no profile", or a
+    // phone that lost signal would be sent to finish signing up or signed out.
+    const gone =
+      isAuthSessionMissingError(authError) ||
+      (isAuthApiError(authError) &&
+        (authError.status === 401 || authError.status === 403 || authError.code === 'user_not_found'));
+    if (!gone) throw new Error(authError.message);
     // The server no longer knows this account (a db reset, a deleted user), so the
     // session saved on the phone is stale; dropping it lands on the sign-in screen.
     await supabase.auth.signOut({ scope: 'local' });

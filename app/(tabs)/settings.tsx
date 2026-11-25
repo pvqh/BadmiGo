@@ -49,7 +49,7 @@ export default function Settings() {
   const preferences = usePreferences(me.id);
   const update = useUpdatePreferences(me.id);
   const push = usePushState();
-  const setPush = useSetPush(me.id);
+  const setPush = useSetPush();
 
   const [displayName, setDisplayName] = useState(me.display_name);
   const renaming = useChangeDisplayName(me.id);
@@ -60,11 +60,16 @@ export default function Settings() {
     mutationFn: () => changePassword(password),
     onSuccess: () => setPassword(''),
   });
-  // This phone stops receiving the member's notifications before it forgets them.
+  // This phone stops receiving the member's notifications before it forgets them. A
+  // failed clean-up must not trap anyone in the account; a dead address is dropped
+  // the first time the push service reports it gone.
   const leaving = useMutation({
     mutationFn: async () => {
-      await turnOffPush();
-      await signOut();
+      try {
+        await turnOffPush();
+      } finally {
+        await signOut();
+      }
     },
   });
 

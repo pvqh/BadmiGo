@@ -9,6 +9,7 @@
  *
  *   npx supabase start && npm run smoke
  */
+import { assertBrowserEdges } from './smoke-browser.ts';
 import { call, check, checksPassed, local, register, type Member } from './smoke-client.ts';
 
 async function main(): Promise<void> {
@@ -51,8 +52,8 @@ async function main(): Promise<void> {
   });
   check(refused.status === 409, 'a stranger is refused by the lifecycle, not by luck');
   check(
-    (refused.body as { rejection: string }).rejection === 'not-a-participant',
-    'and told exactly why',
+    (refused.body as { error: string }).error === 'Bạn không ở trong trận này',
+    'and told exactly why, in words a phone can show',
   );
 
   console.log('\na club member cannot rebuild the ladder on request');
@@ -83,6 +84,8 @@ async function main(): Promise<void> {
   await assertRatingsMoved(gameId, members);
 
   await assertAdminCorrects(gameId, members);
+
+  await assertBrowserEdges(gameId, members);
 
   await assertMerge(members, run);
 

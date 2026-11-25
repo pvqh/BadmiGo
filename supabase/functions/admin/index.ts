@@ -2,8 +2,8 @@ import { MIN_PASSWORD, type AdminAction } from '../../../src/data/function-contr
 import type { GameEvent } from '../../../src/domain/game-lifecycle.ts';
 import { asGameFormat, asTier } from '../../../src/domain/types.ts';
 import { validateScore } from '../../../src/domain/validation.ts';
-import { applyGameEvent } from '../_shared/game-state.ts';
-import { callerProfileId, json, preflight, serviceClient, type ServiceClient } from '../_shared/supabase.ts';
+import { applyGameEvent, REFUSAL_MESSAGE } from '../_shared/game-state.ts';
+import { callerProfileId, json, serve, serviceClient, type ServiceClient } from '../_shared/supabase.ts';
 
 /**
  * Everything an admin does that a club member's own token must not (stories 5 and
@@ -14,10 +14,7 @@ import { callerProfileId, json, preflight, serviceClient, type ServiceClient } f
  * Appointing another admin (story 72) is not here: row-level security already lets an
  * admin set is_admin directly, and it moves no rating.
  */
-Deno.serve(async (request) => {
-  const early = preflight(request);
-  if (early !== null) return early;
-
+serve(async (request) => {
   const service = serviceClient();
 
   const callerId = await callerProfileId(service, request);
@@ -49,11 +46,15 @@ async function perform(service: ServiceClient, body: AdminAction): Promise<strin
     case 'resolve':
       return applyEvent(service, body.gameId, { kind: 'resolve' });
     case 'set-seed-tier': {
-      const { error } = await service
+      // Selected back, because an update that matches nobody is not an error to Postgres.
+      const { data, error } = await service
         .from('profiles')
         .update({ seed_tier: body.seedTier })
-        .eq('id', body.profileId);
-      return error === null ? null : error.message;
+        .eq('id', body.profileId)
+        .select('id')
+        .maybeSingle();
+      if (error !== null) return error.message;
+      return data === null ? 'Không tìm thấy người chơi này' : null;
     }
     case 'merge': {
       // Deletes the duplicate's login in the same transaction, so a failure leaves both.
@@ -78,7 +79,7 @@ async function applyEvent(
   event: GameEvent,
 ): Promise<string | null> {
   const outcome = await applyGameEvent(service, gameId, event);
-  return outcome.ok ? null : outcome.reason;
+  return outcome.ok ? null : REFUSAL_MESSAGE[outcome.reason];
 }
 
 /**

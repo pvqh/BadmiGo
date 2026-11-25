@@ -216,6 +216,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"claim_push_subscription":
+{ Args: { "p_auth": string,"p_endpoint": string,"p_p256dh": string }; Returns: undefined
+                           },
 "create_my_profile":
 { Args: { "p_avatar_path"?: string,"p_display_name": string,"p_gender": Database["public"]['Enums']["gender"],"p_seed_tier": Database["public"]['Enums']["tier"] }; Returns: {
               "avatar_path": string | null,

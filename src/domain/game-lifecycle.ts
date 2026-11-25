@@ -3,7 +3,7 @@ import type { ProfileId } from './types.ts';
 /** A game nobody responded to is accepted, so one silent player cannot hold the ladder hostage. */
 export const AUTO_ACCEPT_MS = 24 * 60 * 60 * 1000;
 
-const CANCELLED_BY_LOGGER = 'cancelled by the logger';
+export const CANCELLED_BY_LOGGER = 'cancelled by the logger';
 
 export type GameStatus = 'pending' | 'confirmed' | 'disputed' | 'voided';
 

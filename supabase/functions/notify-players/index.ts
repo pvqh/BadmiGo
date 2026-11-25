@@ -1,5 +1,5 @@
 import { pushEach, type Message, type Preference } from '../_shared/push.ts';
-import { callerClient, callerProfileId, json, preflight, serviceClient } from '../_shared/supabase.ts';
+import { callerClient, callerProfileId, json, serve, serviceClient } from '../_shared/supabase.ts';
 import type { ServiceClient } from '../_shared/supabase.ts';
 
 const KINDS = ['confirmation-request', 'dispute'] as const;
@@ -28,25 +28,28 @@ function parse(payload: unknown): Body | null {
  * member whose phone has just logged a game asks for the confirmation request
  * itself, and is allowed to only for a game they played in.
  */
-Deno.serve(async (request) => {
-  const early = preflight(request);
-  if (early !== null) return early;
-
+serve(async (request) => {
   const service = serviceClient();
 
+  const asker = await askerOf(service, request);
+  if (asker === null) return json({ error: 'Hãy đăng nhập trước' }, 401);
+
   const body = parse(await request.json().catch(() => null));
-  if (body === null) return json({ error: `kind must be one of ${KINDS.join(', ')}` }, 400);
+  if (body === null) return json({ error: 'Không có loại thông báo này' }, 400);
 
   const participants = await service
     .from('game_participants')
     .select('profile_id')
     .eq('game_id', body.gameId);
   if (participants.error !== null) return json({ error: participants.error.message }, 500);
-  if (participants.data.length === 0) return json({ error: 'Không tìm thấy trận này' }, 404);
 
+  // A member hears "not yours" for a game that does not exist too, so the reply
+  // cannot be used to tell which games exist.
   const playing = participants.data.map((row) => row.profile_id);
-  const asker = await authorise(service, request, playing);
-  if (asker === 'denied') return json({ error: 'Bạn không ở trong trận này' }, 403);
+  if (asker !== SERVICE && !playing.includes(asker)) {
+    return json({ error: 'Bạn không ở trong trận này' }, 403);
+  }
+  if (playing.length === 0) return json({ error: 'Không tìm thấy trận này' }, 404);
 
   const game = await service
     .from('games')
@@ -70,21 +73,23 @@ Deno.serve(async (request) => {
   return json({ sent });
 });
 
-/** A member may announce only a game they played in; the service role may announce any. */
-async function authorise(
+const SERVICE = Symbol('service role');
+
+/**
+ * The service role may announce any game; a member, only one they played in, which
+ * is checked once the game is read. Null for a caller who is neither.
+ */
+async function askerOf(
   service: ServiceClient,
   request: Request,
-  playing: readonly string[],
-): Promise<'service' | 'participant' | 'denied'> {
+): Promise<typeof SERVICE | string | null> {
   const authorization = request.headers.get('Authorization');
-  if (authorization === null) return 'denied';
+  if (authorization === null) return null;
 
   const role = await callerClient(authorization).rpc('current_role_name');
-  if (role.error === null && role.data === 'service_role') return 'service';
+  if (role.error === null && role.data === 'service_role') return SERVICE;
 
-  const profileId = await callerProfileId(service, request);
-  if (profileId !== null && playing.includes(profileId)) return 'participant';
-  return 'denied';
+  return callerProfileId(service, request);
 }
 
 const MESSAGES: Record<

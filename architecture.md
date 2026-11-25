@@ -695,9 +695,9 @@ the push service reports as gone (404, 410). One bad phone never stops the rest.
 1. Resolve the caller's profile from the bearer token; 401 if absent.
 2. Parse `{ gameId, answer }` where answer is `confirm` | `dispute` | `cancel`.
    `void` and `resolve` are the admin's and deliberately do not exist on this route.
-3. `applyGameEvent`. A rejection becomes **409 with the reducer's own reason string**
-   (`not-a-participant`, `already-responded`, `not-the-logger`, …), a missing game 404,
-   contention 503.
+3. `applyGameEvent`. A rejection becomes **409 with a Vietnamese sentence** looked up
+   from the reducer's reason in `REFUSAL_MESSAGE` (`_shared/game-state.ts`), a missing
+   game 404, contention 503. Every non-2xx reply from every function is `{ error }`.
 4. If the game is now `confirmed`, **invoke `replay-ratings`**. Replaying here rather
    than on a schedule is what makes a confirming player see the ladder change. A
    failure past this point leaves the record right and the ladder stale — which
@@ -950,7 +950,7 @@ and in Settings, but only on an iPhone that has the app open in a Safari tab
 Settings switch (a tap)  ->  Notification.requestPermission()
                          ->  register /BadmiGo/sw.js
                          ->  pushManager.subscribe(VAPID public key)
-                         ->  upsert push_subscriptions (endpoint, p256dh, auth)
+                         ->  rpc claim_push_subscription (endpoint, p256dh, auth)
 
 server: _shared/push.ts  ->  web-push signs (VAPID) + encrypts (aes128gcm)
                          ->  Apple / Google / Mozilla push service  ->  phone
@@ -1237,9 +1237,10 @@ From the 2026-11-04 review, fixed on 2026-11-24:
 4. **Minor: `inflateSigmaForIdleTime` contradicts its own test name.**
    `if (sigma >= SIGMA_INITIAL) return SIGMA_INITIAL` *deflates* anyone above the
    initial. Unreachable today because OpenSkill never grows sigma.
-5. **Minor: two client clocks reach the database.** `turnOnPush` and
-   `updatePreferences` send `updated_at` from the browser's clock. A column default
-   plus a `before update` trigger would keep that rule on the server.
+5. **Minor: a client clock reaches the database.** `updatePreferences` sends
+   `updated_at` from the browser's clock (`turnOnPush` no longer does; its RPC uses
+   `now()`). A column default plus a `before update` trigger would keep that rule on
+   the server.
 6. **Minor: a newly appointed admin** sees the admin screens only after reopening the
    app, because the session reads a member's profile once.
 

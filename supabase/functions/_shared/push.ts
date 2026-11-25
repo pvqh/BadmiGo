@@ -66,7 +66,8 @@ export async function pushEach(
         );
         delivered += 1;
       } catch (error) {
-        if (error instanceof webpush.WebPushError && GONE.has(error.statusCode)) {
+        const status = statusOf(error);
+        if (status !== null && GONE.has(status)) {
           await service.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
         } else {
           console.error('push failed', subscription.endpoint, error);
@@ -75,4 +76,12 @@ export async function pushEach(
     }
   }
   return delivered;
+}
+
+/** web-push ships no types, so its error is narrowed by shape rather than by class. */
+function statusOf(error: unknown): number | null {
+  return typeof error === 'object' && error !== null && 'statusCode' in error &&
+      typeof error.statusCode === 'number'
+    ? error.statusCode
+    : null;
 }

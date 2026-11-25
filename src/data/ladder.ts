@@ -87,7 +87,8 @@ export async function readReplayState() {
 }
 
 export async function searchPlayers(term: string) {
-  const pattern = `%${term.trim()}%`;
+  // Quoted, so a typed comma or bracket stays part of the name instead of splitting the filter.
+  const pattern = `"%${term.trim().replace(/["\\]/g, '\\$&')}%"`;
   return unwrap(
     await supabase
       .from('profiles')

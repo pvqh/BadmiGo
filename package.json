@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "simulate": "vitest run src/simulation",
     "smoke": "node scripts/smoke.ts",
-    "types:db": "supabase gen types typescript --local --schema public > src/data/database.types.ts"
+    "types:db": "supabase gen types typescript --local --schema public > src/data/database.types.ts",
+    "deploy:functions": "supabase functions deploy --import-map supabase/functions/deno.json"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

@@ -1,9 +1,13 @@
-# Builds the web app and publishes it to GitHub Pages on every push to main.
+# Builds the web app and publishes it to GitHub Pages on every push to main, and
+# deploys the Edge Functions from the same push, so the two cannot drift apart.
 #
 # The three EXPO_PUBLIC_ values are inlined into the bundle, which anyone can read, so
 # they are repository *variables*, not secrets (Settings -> Secrets and variables ->
 # Actions -> Variables). Nothing secret belongs in this build.
-name: Deploy to GitHub Pages
+#
+# The functions deploy needs the variable SUPABASE_PROJECT_REF and the secret
+# SUPABASE_ACCESS_TOKEN; until the variable is set, that one job is skipped.
+name: Deploy
 
 on:
   push:
@@ -41,8 +45,16 @@ jobs:
         with:
           path: dist
 
+  # The app's typecheck excludes supabase/functions, which is Deno's to check.
+  check-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+      - run: deno check --no-lock --config supabase/functions/deno.json supabase/functions/*/index.ts
+
   deploy:
-    needs: build
+    needs: [build, check-functions]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -50,3 +62,18 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  deploy-functions:
+    needs: [build, check-functions]
+    if: vars.SUPABASE_PROJECT_REF != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run deploy:functions -- --remote=${{ vars.SUPABASE_PROJECT_REF }} --yes
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

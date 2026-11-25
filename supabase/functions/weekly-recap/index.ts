@@ -2,7 +2,7 @@ import { recapFor } from '../../../src/domain/recap.ts';
 import type { RatingChange } from '../../../src/domain/rating.ts';
 import { pushEach } from '../_shared/push.ts';
 import { parseReplayInput } from '../_shared/replay-input.ts';
-import { callerClient, json } from '../_shared/supabase.ts';
+import { callerClient, json, serve } from '../_shared/supabase.ts';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const PERMISSION_DENIED = '42501';
@@ -15,7 +15,7 @@ const PERMISSION_DENIED = '42501';
  * Runs as its caller, and replay_input is granted to service_role alone, so a member
  * cannot have the club's recap sent on demand.
  */
-Deno.serve(async (request) => {
+serve(async (request) => {
   const authorization = request.headers.get('Authorization');
   if (authorization === null) return json({ error: 'sign in first' }, 401);
   const caller = callerClient(authorization);

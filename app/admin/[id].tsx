@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import type { Member } from '../../src/data/admin';
 import { MIN_PASSWORD } from '../../src/data/function-contract';
-import { TIERS } from '../../src/domain/types';
+import { TIERS, type Tier } from '../../src/domain/types';
 import { Nothing, Pending, Problem } from '../../src/ui/components/async';
 import { Button, ButtonRow } from '../../src/ui/components/button';
 import { Choice, Field } from '../../src/ui/components/field';
@@ -24,6 +24,8 @@ export default function MemberAdmin() {
   const [password, setPassword] = useState('');
   const [search, setSearch] = useState('');
   const [keep, setKeep] = useState<Member | null>(null);
+  // A new seed tier replays the whole club, so a stray tap only proposes it.
+  const [seedTier, setSeedTier] = useState<Tier | null>(null);
 
   if (members.isPending) return <Pending />;
   if (members.isError) {
@@ -60,10 +62,25 @@ export default function MemberAdmin() {
       <View style={layout.card}>
         <Text style={font.heading}>Trình độ xuất phát</Text>
         <Choice
-          onChange={(seedTier) => act.mutate({ action: 'set-seed-tier', profileId: member.id, seedTier })}
+          onChange={(tier) => setSeedTier(tier === member.seed_tier ? null : tier)}
           options={TIERS.map((tier) => ({ value: tier, label: TIER_LABEL[tier] }))}
-          value={member.seed_tier}
+          value={seedTier ?? member.seed_tier}
         />
+        {seedTier === null ? null : (
+          <ButtonRow>
+            <Button
+              busy={act.isPending}
+              label={`Đổi sang ${TIER_LABEL[seedTier]}`}
+              onPress={() =>
+                act.mutate(
+                  { action: 'set-seed-tier', profileId: member.id, seedTier },
+                  { onSuccess: () => setSeedTier(null) },
+                )
+              }
+            />
+            <Button label="Thôi" onPress={() => setSeedTier(null)} tone="quiet" />
+          </ButtonRow>
+        )}
         <Text style={font.dim}>
           Điểm xuất phát của người này. Đổi sẽ tính lại cả câu lạc bộ, nên mọi điểm từ đó
           đến nay đều thay đổi theo.

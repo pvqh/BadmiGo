@@ -3,7 +3,7 @@ import { replayRatings } from '../../../src/domain/rating.ts';
 import type { Json } from '../../../src/data/database.types.ts';
 import { pushEach } from '../_shared/push.ts';
 import { parseReplayInput } from '../_shared/replay-input.ts';
-import { callerClient, json, type ServiceClient } from '../_shared/supabase.ts';
+import { callerClient, json, serve, type ServiceClient } from '../_shared/supabase.ts';
 
 const PERMISSION_DENIED = '42501';
 
@@ -16,7 +16,7 @@ const PERMISSION_DENIED = '42501';
  * service_role alone, so a club member with a valid token gets 403 from the database
  * rather than a free rebuild on request.
  */
-Deno.serve(async (request) => {
+serve(async (request) => {
   const authorization = request.headers.get('Authorization');
   if (authorization === null) return json({ error: 'sign in first' }, 401);
   const caller = callerClient(authorization);

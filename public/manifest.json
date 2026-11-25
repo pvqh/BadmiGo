@@ -1,6 +1,7 @@
 {
   "name": "Badminton Leaderboard",
   "short_name": "Leaderboard",
+  "lang": "vi",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,5 +1,5 @@
 import { applyGameEvent } from '../_shared/game-state.ts';
-import { callerClient, json } from '../_shared/supabase.ts';
+import { callerClient, json, serve } from '../_shared/supabase.ts';
 
 /**
  * Sweeps games nobody answered, so one member who does not open the app cannot hold
@@ -9,7 +9,7 @@ import { callerClient, json } from '../_shared/supabase.ts';
  * Scheduled hourly. Runs as its caller, and the write it ends in is granted to
  * service_role alone, so a club member cannot sweep the club's pending games.
  */
-Deno.serve(async (request) => {
+serve(async (request) => {
   const authorization = request.headers.get('Authorization');
   if (authorization === null) return json({ error: 'sign in first' }, 401);
   const caller = callerClient(authorization);

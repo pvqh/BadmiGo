@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import type { ConfirmationState } from '../../src/domain/game-lifecycle';
+import { CANCELLED_BY_LOGGER, type ConfirmationState } from '../../src/domain/game-lifecycle';
 import { Pending, Problem } from '../../src/ui/components/async';
 import { AdminGamePanel } from '../../src/ui/components/admin-game-panel';
 import { Button, ButtonRow } from '../../src/ui/components/button';
@@ -93,7 +93,9 @@ export default function GameDetail() {
 
       {row.status === 'voided' ? (
         <Text style={font.dim}>
-          {`Admin đã gỡ trận này${row.void_reason === null ? '' : `: ${row.void_reason}`}. Trận không được tính điểm.`}
+          {row.void_reason === CANCELLED_BY_LOGGER
+            ? 'Người ghi đã huỷ trận này. Trận không được tính điểm.'
+            : `Admin đã gỡ trận này${row.void_reason === null ? '' : `: ${row.void_reason}`}. Trận không được tính điểm.`}
         </Text>
       ) : null}
 
@@ -107,7 +109,8 @@ export default function GameDetail() {
                 onPress={() =>
                   answering.mutate(
                     { gameId: row.id, answer: 'cancel' },
-                    { onSuccess: () => router.back() },
+                    // Opened from a notification, there is no history to go back to.
+                    { onSuccess: () => (router.canGoBack() ? router.back() : router.replace('/feed')) },
                   )
                 }
                 tone="danger"

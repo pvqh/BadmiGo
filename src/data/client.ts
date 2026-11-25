@@ -53,6 +53,16 @@ export function unwrap<T>(result: PostgrestSingleResponse<T>): T {
   return result.data;
 }
 
+/** A function's refusal, carrying its status so a caller can tell 409 "too late" from a fault. */
+export class Refused extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 /**
  * Calls an Edge Function. A refusal comes back as the function's own sentence, because
  * "Edge Function returned a non-2xx status code" tells nobody why it was refused.
@@ -60,11 +70,11 @@ export function unwrap<T>(result: PostgrestSingleResponse<T>): T {
 export async function invoke<T>(name: string, body: object): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>(name, { body });
   if (error !== null) {
-    const reply: unknown =
-      error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null;
+    if (!(error instanceof FunctionsHttpError)) throw new Error(error.message);
+    const reply: unknown = await error.context.json().catch(() => null);
     const reason =
       typeof reply === 'object' && reply !== null && 'error' in reply ? String(reply.error) : null;
-    throw new Error(reason ?? error.message);
+    throw new Refused(reason ?? error.message, error.context.status);
   }
   if (data === null) throw new Error(`${name} returned nothing`);
   return data;

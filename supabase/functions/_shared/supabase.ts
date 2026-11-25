@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { corsHeaders } from '@supabase/supabase-js/cors';
 import type { Database } from '../../../src/data/database.types.ts';
 
 export type ServiceClient = SupabaseClient<Database>;
@@ -39,22 +40,32 @@ export async function callerProfileId(
 
 /*
  * The app is served from GitHub Pages, another origin, so the browser refuses any
- * reply without these. A wildcard is safe: the credential is a bearer token, not a cookie.
+ * reply without these. A wildcard is safe: the credential is a bearer token, not a
+ * cookie. The header list is the SDK's own, so an upgrade that sends a new header
+ * cannot break every call in production only.
  */
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-/** The browser's preflight, answered before any sign-in check, or null for a real request. */
-export function preflight(request: Request): Response | null {
-  return request.method === 'OPTIONS' ? new Response(null, { headers: CORS }) : null;
-}
-
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+/**
+ * Every function's entry point. It answers the browser's preflight before any sign-in
+ * check, and turns a throw into a reply that still carries the CORS headers: Deno's
+ * own 500 has none, so the browser would hide the reason behind a generic failure.
+ */
+export function serve(handler: (request: Request) => Promise<Response>): void {
+  Deno.serve(async (request) => {
+    if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+    try {
+      return await handler(request);
+    } catch (error) {
+      console.error(error);
+      const reason = error instanceof Error ? error.message : String(error);
+      return json({ error: `Máy chủ gặp lỗi: ${reason}` }, 500);
+    }
   });
 }
 

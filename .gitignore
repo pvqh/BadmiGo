@@ -9,14 +9,14 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
+# Private keys, wherever they come from
 *.p8
 *.p12
 *.key
-*.mobileprovision
+*.pem
+
+# merge leftovers
+*.orig.*
 
 # Metro
 .metro-health-check*
@@ -28,7 +28,6 @@ yarn-error.*
 
 # macOS
 .DS_Store
-*.pem
 
 # local env files
 .env*.local
@@ -36,17 +35,12 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
-
 # Filled-in environment files. Only the .example copies are committed.
 .env
 !.env.example
 
-# Review log
-docs/REVIEW_LOGS.md
-docs/MAINTAINING.md
-docs/RULES.md
-docs/BACKEND.md
-docs/APP.md
+# Editor and agent tooling, not the app. Every file under docs/ is tracked.
+.agents/
+.claude/skills/
+.claude/worktrees/
+skills-lock.json

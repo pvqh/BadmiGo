@@ -11,7 +11,8 @@ supabase/functions/    six Deno functions, which import the domain core directly
 supabase/functions/_shared/   the service client, the lifecycle writer, the push sender
 supabase/config.toml   auth settings and per-function settings
 src/data/              the only module that talks to Supabase
-scripts/smoke.ts       the one end-to-end check (plumbing in smoke-client.ts)
+scripts/smoke.ts       the one end-to-end check (plumbing in smoke-client.ts,
+                       browser-facing checks in smoke-browser.ts)
 ```
 
 Two rules shape all of it.
@@ -157,7 +158,7 @@ the GitHub Pages address, from `config.toml`.)
 ```bash
 npx supabase link --project-ref <ref>
 npx supabase db push
-npx supabase functions deploy
+npm run deploy:functions -- --remote=<ref>   # GitHub Actions does this on every push once set up
 npx supabase config push
 npx supabase secrets set --env-file supabase/functions/.env   # the production VAPID keys
 ```
@@ -172,8 +173,9 @@ Every later admin is appointed from the app.
 
 **3. The schedules.** `auto-accept` (hourly) and `weekly-recap` (Sunday evening) have
 no scheduler of their own, and stories 26 and 62 do not work without one. They need
-the project ref and the service role key, so they cannot be migrations. Run this once
-against the production database:
+the project ref and the service role key, so they cannot be migrations. First turn on
+the `pg_cron` and `pg_net` extensions under Database → Extensions; the SQL below needs
+both. Then run this once against the production database:
 
 ```sql
 select vault.create_secret('https://<ref>.supabase.co/functions/v1', 'functions_url');
@@ -205,6 +207,8 @@ select cron.schedule('weekly-recap', '0 13 * * 0', $job$
 $job$);
 ```
 
-Check them with `select * from cron.job_run_details order by start_time desc limit 5;`.
+Check they exist with `select jobname, schedule from cron.job;`, that they run with
+`select * from cron.job_run_details order by start_time desc limit 5;`, and that no
+game has been `pending` for more than a day.
 
 The web app itself is deployed by GitHub Actions; see the manual.

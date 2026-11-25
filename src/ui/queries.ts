@@ -1,15 +1,18 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { readMembers, runAdminAction, setAdmin } from '../data/admin';
 import type { AdminAction } from '../data/function-contract';
 import {
   answerGame,
+  FEED_PAGE,
   logGame,
   readFeed,
   readGame,
   readGamesFor,
   readGamesForReview,
   readMyPendingGames,
+  Refused,
   searchFeed,
+  type FeedCursor,
   type FeedSearch,
   type Answer,
 } from '../data/games';
@@ -86,8 +89,19 @@ export function useStrengths() {
   return useQuery({ queryKey: keys.strengths, queryFn: readStrengths });
 }
 
+/** Story 43 reaches back past the last session, so the feed pages as it is scrolled. */
 export function useFeed() {
-  return useQuery({ queryKey: keys.feed, queryFn: () => readFeed() });
+  return useInfiniteQuery({
+    queryKey: keys.feed,
+    queryFn: ({ pageParam }) => readFeed(pageParam),
+    initialPageParam: null as FeedCursor | null,
+    getNextPageParam: (page): FeedCursor | null => {
+      const last = page.at(-1);
+      return page.length < FEED_PAGE || last === undefined
+        ? null
+        : { playedAt: last.played_at, id: last.id };
+    },
+  });
 }
 
 /** Story 46a. Off until a name or a day is given; the plain feed covers the empty case. */
@@ -158,10 +172,10 @@ export function usePushState() {
   return useQuery({ queryKey: keys.push, queryFn: pushState });
 }
 
-export function useSetPush(profileId: ProfileId) {
+export function useSetPush() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (on: boolean) => (on ? turnOnPush(profileId) : turnOffPush()),
+    mutationFn: (on: boolean) => (on ? turnOnPush() : turnOffPush()),
     onSettled: () => queryClient.invalidateQueries({ queryKey: keys.push }),
   });
 }
@@ -234,13 +248,18 @@ export function useAnswerGame(profileId: ProfileId) {
 
 /**
  * Story 78. One at a time through `confirm-game`, exactly as single taps would be, so
- * replays never overlap; a failure stops the run and the ones already done stay done.
+ * replays never overlap. A game settled by someone else since the list was drawn (a
+ * 409) is skipped; any other failure stops the run and the ones already done stay done.
  */
 export function useConfirmAll() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (gameIds: readonly string[]) => {
-      for (const gameId of gameIds) await answerGame(gameId, 'confirm');
+      for (const gameId of gameIds) {
+        await answerGame(gameId, 'confirm').catch((error: unknown) => {
+          if (!(error instanceof Refused && error.status === 409)) throw error;
+        });
+      }
     },
     onSettled: () => queryClient.invalidateQueries(),
   });

@@ -41,7 +41,7 @@ export default function Feed() {
     return <Problem message={feed.error.message} onRetry={() => void feed.refetch()} />;
   }
 
-  const rows: readonly GameRow[] = searching ? (search.data ?? []) : feed.data;
+  const rows: readonly GameRow[] = searching ? (search.data ?? []) : feed.data.pages.flat();
   const unsettled = searching ? [] : (pending.data ?? []);
   const owed = unsettled.filter((row) => answerOf(row, me.id)?.state === 'pending');
   const open = (row: GameRow) => router.push(`/game/${row.id}`);
@@ -135,6 +135,10 @@ export default function Feed() {
       data={rows}
       keyExtractor={(row) => row.id}
       keyboardShouldPersistTaps="handled"
+      ListFooterComponent={!searching && feed.isFetchingNextPage ? <Pending /> : undefined}
+      onEndReached={() => {
+        if (!searching && feed.hasNextPage && !feed.isFetchingNextPage) void feed.fetchNextPage();
+      }}
       refreshControl={
         <RefreshControl
           onRefresh={() => {

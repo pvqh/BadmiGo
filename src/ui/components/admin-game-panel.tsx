@@ -5,7 +5,7 @@ import { validateScore } from '../../domain/validation';
 import { asGameFormat } from '../../domain/types';
 import { useAdminAction } from '../queries';
 import { colour, font, layout, space } from '../theme';
-import { Button } from './button';
+import { Button, ButtonRow } from './button';
 import { Field } from './field';
 
 /**
@@ -17,6 +17,8 @@ export function AdminGamePanel({ row }: { readonly row: GameRow }) {
   const [scoreA, setScoreA] = useState(String(row.score_a));
   const [scoreB, setScoreB] = useState(String(row.score_b));
   const [reason, setReason] = useState('');
+  // Voiding replays the whole club, so it takes a second tap, like a merge.
+  const [voiding, setVoiding] = useState(false);
 
   if (row.status === 'voided') return null;
 
@@ -68,13 +70,25 @@ export function AdminGamePanel({ row }: { readonly row: GameRow }) {
         placeholder="Không có trận này"
         value={reason}
       />
-      <Button
-        busy={act.isPending}
-        disabled={reason.trim().length === 0}
-        label="Gỡ trận này"
-        onPress={() => act.mutate({ action: 'void', gameId: row.id, reason: reason.trim() })}
-        tone="danger"
-      />
+      {voiding ? (
+        <ButtonRow>
+          <Button
+            busy={act.isPending}
+            disabled={reason.trim().length === 0}
+            label="Gỡ"
+            onPress={() => act.mutate({ action: 'void', gameId: row.id, reason: reason.trim() })}
+            tone="danger"
+          />
+          <Button label="Giữ lại" onPress={() => setVoiding(false)} tone="quiet" />
+        </ButtonRow>
+      ) : (
+        <Button
+          disabled={reason.trim().length === 0}
+          label="Gỡ trận này"
+          onPress={() => setVoiding(true)}
+          tone="danger"
+        />
+      )}
 
       {act.isError ? (
         <Text style={[font.dim, { color: colour.down }]}>{act.error.message}</Text>

@@ -3,6 +3,8 @@ import type { Database } from './database.types';
 import type { GameFormat, ProfileId } from '../domain/types';
 import { searchPlayers } from './ladder';
 
+export { Refused } from './client';
+
 export type Game = Database['public']['Tables']['games']['Row'];
 
 /**
@@ -16,7 +18,7 @@ export async function logGame(input: {
   readonly sideB: readonly [ProfileId, ProfileId];
   readonly scoreA: number;
   readonly scoreB: number;
-}): Promise<string> {
+}): Promise<{ readonly gameId: string; readonly notified: boolean }> {
   const gameId = unwrap(
     await supabase.rpc('log_game', {
       p_format: input.format,
@@ -27,12 +29,14 @@ export async function logGame(input: {
     }),
   );
 
-  // The other three are told by the server, not by this phone staying awake.
-  await supabase.functions.invoke('notify-players', {
-    body: { gameId, kind: 'confirmation-request' },
-  });
+  // The other three are told by the server, not by this phone staying awake. The game
+  // is logged either way; a lost push is only worth a line telling the logger to ask.
+  const notified = await invoke('notify-players', { gameId, kind: 'confirmation-request' }).then(
+    () => true,
+    () => false,
+  );
 
-  return gameId;
+  return { gameId, notified };
 }
 
 export type Answer = 'confirm' | 'dispute' | 'cancel';
@@ -58,16 +62,31 @@ const FEED_SHAPE = `
   rating_history (profile_id, display_before, display_after)
 ` as const;
 
+/** Where the last page ended. The id breaks ties, since games can share a timestamp. */
+export interface FeedCursor {
+  readonly playedAt: string;
+  readonly id: string;
+}
+
+export const FEED_PAGE = 30;
+
 /** The club-wide feed: every confirmed game, newest first, with what it moved. */
-export async function readFeed(limit = 30, before?: string) {
+export async function readFeed(before: FeedCursor | null = null) {
   const query = supabase
     .from('games')
     .select(FEED_SHAPE)
     .eq('status', 'confirmed')
     .order('played_at', { ascending: false })
-    .limit(limit);
+    .order('id', { ascending: false })
+    .limit(FEED_PAGE);
 
-  return unwrap(await (before === undefined ? query : query.lt('played_at', before)));
+  return unwrap(
+    await (before === null
+      ? query
+      : query.or(
+          `played_at.lt."${before.playedAt}",and(played_at.eq."${before.playedAt}",id.lt.${before.id})`,
+        )),
+  );
 }
 
 export interface FeedSearch {

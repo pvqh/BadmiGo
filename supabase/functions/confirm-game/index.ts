@@ -1,5 +1,5 @@
-import { applyGameEvent } from '../_shared/game-state.ts';
-import { callerProfileId, json, preflight, serviceClient } from '../_shared/supabase.ts';
+import { applyGameEvent, REFUSAL_MESSAGE } from '../_shared/game-state.ts';
+import { callerProfileId, json, serve, serviceClient } from '../_shared/supabase.ts';
 import type { GameEvent } from '../../../src/domain/game-lifecycle.ts';
 
 /**
@@ -24,10 +24,7 @@ function parse(payload: unknown): Body | null {
   return { gameId, answer: answer as Answer };
 }
 
-Deno.serve(async (request) => {
-  const early = preflight(request);
-  if (early !== null) return early;
-
+serve(async (request) => {
   const service = serviceClient();
 
   const profileId = await callerProfileId(service, request);
@@ -35,16 +32,16 @@ Deno.serve(async (request) => {
 
   const body = parse(await request.json().catch(() => null));
   if (body === null) {
-    return json({ error: `answer must be one of ${ANSWERS.join(', ')}` }, 400);
+    return json({ error: 'Câu trả lời không hợp lệ' }, 400);
   }
 
   const event: GameEvent = { kind: body.answer, profileId };
   const outcome = await applyGameEvent(service, body.gameId, event);
 
   if (!outcome.ok) {
-    if (outcome.reason === 'game-not-found') return json({ error: 'Không tìm thấy trận này' }, 404);
-    if (outcome.reason === 'contended') return json({ error: 'Có người vừa trả lời cùng lúc. Thử lại nhé.' }, 503);
-    return json({ rejection: outcome.reason }, 409);
+    const status =
+      outcome.reason === 'game-not-found' ? 404 : outcome.reason === 'contended' ? 503 : 409;
+    return json({ error: REFUSAL_MESSAGE[outcome.reason] }, status);
   }
 
   /*
@@ -60,10 +57,12 @@ Deno.serve(async (request) => {
     replayed = replay.error === null;
   }
 
+  // The dispute stands whether or not the alert goes out; a lost one is only logged.
   if (outcome.state.status === 'disputed') {
-    await service.functions.invoke('notify-players', {
+    const alert = await service.functions.invoke('notify-players', {
       body: { gameId: body.gameId, kind: 'dispute' },
     });
+    if (alert.error !== null) console.error('dispute alert failed', alert.error);
   }
 
   return json({ status: outcome.state.status, replayed });

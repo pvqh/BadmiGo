@@ -661,7 +661,8 @@ npm run export:web        # the static site GitHub Pages serves, into dist/
 commit and push to `main`; GitHub builds and publishes it (Part 11).
 
 **Changing an Edge Function:** the local stack picks up a saved file on the next
-request. When it is live: `npx supabase functions deploy` (Part 12).
+request. When it is live: pushing to `main` deploys it (Part 11.4), or by hand
+`npm run deploy:functions -- --remote=<your-project-ref>`.
 
 ---
 
@@ -713,6 +714,21 @@ tab (*Run workflow*) — for example after changing a variable.
 > `public/index.html`, and `site_url` in `supabase/config.toml`. Change all three
 > together.
 
+### 11.4 Once: let the push deploy the Edge Functions too
+
+The same workflow type-checks the six functions with Deno and, once it knows your
+project, deploys them, so the app and the functions always ship together. Until then
+that one job is skipped.
+
+1. Make an access token at <https://supabase.com/dashboard/account/tokens>.
+2. **Settings → Secrets and variables → Actions → Secrets tab → New repository
+   secret**: `SUPABASE_ACCESS_TOKEN`, the token. This one *is* a secret.
+3. **Variables tab → New repository variable**: `SUPABASE_PROJECT_REF`, your project
+   ref (the `<ref>` in `https://<ref>.supabase.co`).
+
+Migrations are still yours to push (`npx supabase db push`); the workflow never
+changes the database.
+
 ---
 
 ## Part 12 — Put the backend live
@@ -727,7 +743,7 @@ Make a free project at <https://supabase.com>, then:
 ```powershell
 npx supabase link --project-ref <your-project-ref>
 npx supabase db push             # apply the migrations to the hosted database
-npx supabase functions deploy --import-map supabase/functions/deno.json   # all six; without the flag the bundler cannot find npm packages
+npm run deploy:functions -- --remote=<your-project-ref>   # all six; after Part 11.4, every push does this
 npx supabase config push         # push the auth settings, including the site URL
 ```
 
@@ -882,6 +898,12 @@ were ever changed, every phone has to switch notifications off and on again.
 `127.0.0.1` means "this device", and your phone is not your PC. Use your PC's LAN IP —
 see the note at the end of Part 5. Both devices on the same Wi-Fi. Windows Firewall may
 also need to allow Node and Docker through.
+
+### The live app fails for everyone after a long break
+
+A free Supabase project pauses after about a week with no traffic, for example over
+Tết. Nothing comes back by itself: open the project in the Supabase dashboard and
+choose **Restore project**, then wait a few minutes. The data is kept.
 
 ### Tests pass but the app behaves differently
 
