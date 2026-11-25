@@ -1,5 +1,5 @@
 import { pushEach, type Message, type Preference } from '../_shared/push.ts';
-import { callerClient, callerProfileId, json, serviceClient } from '../_shared/supabase.ts';
+import { callerClient, callerProfileId, json, preflight, serviceClient } from '../_shared/supabase.ts';
 import type { ServiceClient } from '../_shared/supabase.ts';
 
 const KINDS = ['confirmation-request', 'dispute'] as const;
@@ -29,6 +29,9 @@ function parse(payload: unknown): Body | null {
  * itself, and is allowed to only for a game they played in.
  */
 Deno.serve(async (request) => {
+  const early = preflight(request);
+  if (early !== null) return early;
+
   const service = serviceClient();
 
   const body = parse(await request.json().catch(() => null));

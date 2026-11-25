@@ -3,7 +3,7 @@ import type { GameEvent } from '../../../src/domain/game-lifecycle.ts';
 import { asGameFormat, asTier } from '../../../src/domain/types.ts';
 import { validateScore } from '../../../src/domain/validation.ts';
 import { applyGameEvent } from '../_shared/game-state.ts';
-import { callerProfileId, json, serviceClient, type ServiceClient } from '../_shared/supabase.ts';
+import { callerProfileId, json, preflight, serviceClient, type ServiceClient } from '../_shared/supabase.ts';
 
 /**
  * Everything an admin does that a club member's own token must not (stories 5 and
@@ -15,6 +15,9 @@ import { callerProfileId, json, serviceClient, type ServiceClient } from '../_sh
  * admin set is_admin directly, and it moves no rating.
  */
 Deno.serve(async (request) => {
+  const early = preflight(request);
+  if (early !== null) return early;
+
   const service = serviceClient();
 
   const callerId = await callerProfileId(service, request);

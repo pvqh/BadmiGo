@@ -1,5 +1,5 @@
 import { applyGameEvent } from '../_shared/game-state.ts';
-import { callerProfileId, json, serviceClient } from '../_shared/supabase.ts';
+import { callerProfileId, json, preflight, serviceClient } from '../_shared/supabase.ts';
 import type { GameEvent } from '../../../src/domain/game-lifecycle.ts';
 
 /**
@@ -25,6 +25,9 @@ function parse(payload: unknown): Body | null {
 }
 
 Deno.serve(async (request) => {
+  const early = preflight(request);
+  if (early !== null) return early;
+
   const service = serviceClient();
 
   const profileId = await callerProfileId(service, request);

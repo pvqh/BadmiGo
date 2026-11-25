@@ -37,10 +37,24 @@ export async function callerProfileId(
   return data.user.id;
 }
 
+/*
+ * The app is served from GitHub Pages, another origin, so the browser refuses any
+ * reply without these. A wildcard is safe: the credential is a bearer token, not a cookie.
+ */
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+/** The browser's preflight, answered before any sign-in check, or null for a real request. */
+export function preflight(request: Request): Response | null {
+  return request.method === 'OPTIONS' ? new Response(null, { headers: CORS }) : null;
+}
+
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 }
 
