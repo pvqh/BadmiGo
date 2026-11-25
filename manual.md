@@ -727,7 +727,7 @@ Make a free project at <https://supabase.com>, then:
 ```powershell
 npx supabase link --project-ref <your-project-ref>
 npx supabase db push             # apply the migrations to the hosted database
-npx supabase functions deploy    # deploy all six Edge Functions
+npx supabase functions deploy --import-map supabase/functions/deno.json   # all six; without the flag the bundler cannot find npm packages
 npx supabase config push         # push the auth settings, including the site URL
 ```
 
