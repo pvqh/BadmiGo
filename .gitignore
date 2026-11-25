@@ -46,3 +46,7 @@ yarn-error.*
 
 # Review log
 docs/REVIEW_LOGS.md
+docs/MAINTAINING.md
+docs/RULES.md
+docs/BACKEND.md
+docs/APP.md

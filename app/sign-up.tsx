@@ -8,11 +8,13 @@ import { Button } from '../src/ui/components/button';
 import { Field } from '../src/ui/components/field';
 import { useUsernameCheck } from '../src/ui/queries';
 import { colour, font, layout } from '../src/ui/theme';
+import { pickUsernameExample } from '../src/ui/username-examples';
 
 export default function SignUp() {
   const router = useRouter();
   const [handle, setHandle] = useState('');
   const [password, setPassword] = useState('');
+  const [example] = useState(pickUsernameExample);
 
   const check = useUsernameCheck(handle);
   const signingUp = useMutation({ mutationFn: () => signUp(handle, password) });
@@ -29,7 +31,7 @@ export default function SignUp() {
           hint="3 đến 20 ký tự: chữ hoa, chữ thường, số và _ . - đều được. Khi đăng nhập không cần gõ đúng chữ hoa."
           label="Tên đăng nhập"
           onChangeText={setHandle}
-          placeholder="HungDepTrai01"
+          placeholder={example}
           problem={check.isError ? check.error.message : (check.data ?? null)}
           value={handle}
         />

@@ -12,6 +12,7 @@ import { GameCard } from './components/game-card';
 import { RatingGraph } from './components/rating-graph';
 import { statsFor, startOfMonth } from './player-stats';
 import {
+  usePlayer,
   usePlayerGames,
   usePlayerRating,
   useRatingHistory,
@@ -45,6 +46,7 @@ export function PlayerProfile({
   const insets = useSafeAreaInsets();
   const me = useMember();
 
+  const player = usePlayer(profileId);
   const rating = usePlayerRating(profileId);
   const history = useRatingHistory(profileId);
   const played = usePlayerGames(profileId);
@@ -70,8 +72,8 @@ export function PlayerProfile({
     return <Problem message={played.error.message} onRetry={() => void played.refetch()} />;
   }
 
-  const name = rating.data?.profiles.display_name ?? fallbackName;
-  const avatarPath = rating.data?.profiles.avatar_path ?? null;
+  const name = player.data?.display_name ?? fallbackName;
+  const avatarPath = player.data?.avatar_path ?? null;
   const next =
     rating.data === null || rating.data === undefined || rating.data.in_placement
       ? null

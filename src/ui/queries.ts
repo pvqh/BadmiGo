@@ -15,6 +15,7 @@ import {
 } from '../data/games';
 import {
   readLadder,
+  readPlayer,
   readRating,
   readRatingHistory,
   readReplayState,
@@ -48,6 +49,7 @@ export const keys = {
   pending: (profileId: ProfileId) => ['pending', profileId] as const,
   game: (gameId: string) => ['game', gameId] as const,
   playerGames: (profileId: ProfileId) => ['player-games', profileId] as const,
+  player: (profileId: ProfileId) => ['player', profileId] as const,
   rating: (profileId: ProfileId) => ['rating', profileId] as const,
   history: (profileId: ProfileId) => ['history', profileId] as const,
   search: (term: string) => ['search', term] as const,
@@ -118,6 +120,10 @@ export function usePlayerGames(profileId: ProfileId) {
     queryKey: keys.playerGames(profileId),
     queryFn: () => readGamesFor(profileId),
   });
+}
+
+export function usePlayer(profileId: ProfileId) {
+  return useQuery({ queryKey: keys.player(profileId), queryFn: () => readPlayer(profileId) });
 }
 
 export function usePlayerRating(profileId: ProfileId) {

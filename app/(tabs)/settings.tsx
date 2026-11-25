@@ -37,8 +37,7 @@ const NOTIFICATIONS: readonly { readonly key: Switchable; readonly label: string
 ];
 
 const PUSH_UNAVAILABLE: Record<Exclude<PushState, 'off' | 'on'>, string> = {
-  'needs-install':
-    'Hãy thêm ứng dụng vào màn hình chính trước; iPhone chỉ gửi thông báo khi mở ứng dụng từ đó.',
+  'needs-install': '',
   blocked:
     'Thông báo đang bị chặn cho trang này. Hãy cho phép trong cài đặt của điện thoại.',
   unsupported:
@@ -109,13 +108,11 @@ export default function Settings() {
           ]}
           value={scheme}
         />
-        <Text style={font.dim}>Chỉ áp dụng trên máy này. Ứng dụng tải lại khi đổi.</Text>
       </View>
 
       <View style={layout.card}>
         <Text style={font.heading}>Tên hiển thị</Text>
         <Field
-          hint="Tên hiện trên bảng xếp hạng và bảng tin."
           label="Tên mới"
           maxLength={DISPLAY_NAME_MAX}
           onChangeText={setDisplayName}

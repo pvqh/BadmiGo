@@ -7,10 +7,12 @@ import { Button } from '../src/ui/components/button';
 import { Field } from '../src/ui/components/field';
 import { InstallHint } from '../src/ui/components/install-hint';
 import { colour, font, layout, space } from '../src/ui/theme';
+import { pickUsernameExample } from '../src/ui/username-examples';
 
 export default function SignIn() {
   const [handle, setHandle] = useState('');
   const [password, setPassword] = useState('');
+  const [example] = useState(pickUsernameExample);
 
   const signingIn = useMutation({ mutationFn: () => signIn(handle, password) });
   const ready = handle.trim().length > 0 && password.length > 0;
@@ -30,12 +32,13 @@ export default function SignIn() {
         <View style={{ height: space.row }} />
 
         <Field
+  
           autoCapitalize="none"
           autoComplete="username"
           autoCorrect={false}
           label="Tên đăng nhập"
           onChangeText={setHandle}
-          placeholder="TrangXinhGai01"
+          placeholder={example}
           value={handle}
         />
         <Field

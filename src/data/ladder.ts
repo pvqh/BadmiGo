@@ -38,11 +38,25 @@ export async function readStrengths() {
 export async function readRating(profileId: ProfileId) {
   const { data, error } = await supabase
     .from('player_ratings')
-    .select('*, profiles!inner (username, display_name, gender, seed_tier, avatar_path)')
+    .select('*')
     .eq('profile_id', profileId)
     .maybeSingle();
   if (error !== null) throw new Error(error.message);
   return data;
+}
+
+/**
+ * A player's name and picture, read from their profile rather than through their
+ * rating, because a member who joined since the last replay has no rating row yet.
+ */
+export async function readPlayer(profileId: ProfileId) {
+  return unwrap(
+    await supabase
+      .from('profiles')
+      .select('display_name, avatar_path')
+      .eq('id', profileId)
+      .single(),
+  );
 }
 
 /**
