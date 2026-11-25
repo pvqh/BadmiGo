@@ -1,6 +1,6 @@
 {
-  "name": "Badminton Ladder",
-  "short_name": "Ladder",
+  "name": "Badminton Leaderboard",
+  "short_name": "Leaderboard",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

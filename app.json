@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "Badminton Ladder",
-    "slug": "badminton-ladder",
-    "scheme": "badmintonladder",
+    "name": "Badminton Leaderboard",
+    "slug": "badminton-leaderboard",
+    "scheme": "badmintonleaderboard",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo.jpg",
     "userInterfaceStyle": "light",
     "platforms": [
       "web"
     ],
     "web": {
       "output": "single",
-      "favicon": "./assets/icon.png"
+      "favicon": "./assets/logo.jpg"
     },
     "experiments": {
       "baseUrl": "/BadmiGo"
