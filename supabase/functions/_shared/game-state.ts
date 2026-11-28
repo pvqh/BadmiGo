@@ -20,7 +20,6 @@ export const REFUSAL_MESSAGE: Record<Refusal, string> = {
   'already-confirmed': 'Trận này đã được xác nhận rồi',
   'not-the-logger': 'Chỉ người ghi mới huỷ được trận này',
   'not-disputed': 'Trận này không bị phản đối',
-  'auto-accept-window-open': 'Trận này chưa hết 24 giờ chờ xác nhận',
   'game-is-frozen': 'Trận này đang bị phản đối nên tạm đóng băng',
   'game-is-voided': 'Trận này đã bị gỡ hoặc huỷ',
   'game-not-found': 'Không tìm thấy trận này',
@@ -62,7 +61,7 @@ async function readGameState(
 ): Promise<GameState | null> {
   const game = await service
     .from('games')
-    .select('logger_id, created_at, status, void_reason')
+    .select('logger_id, status, void_reason')
     .eq('id', gameId)
     .maybeSingle();
   if (game.error !== null) throw new Error(game.error.message);
@@ -86,7 +85,6 @@ async function readGameState(
   return {
     status: game.data.status,
     logger: game.data.logger_id,
-    loggedAt: Date.parse(game.data.created_at),
     confirmations,
     ...(game.data.void_reason === null ? {} : { voidReason: game.data.void_reason }),
   };

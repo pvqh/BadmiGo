@@ -1,4 +1,6 @@
+import { announceGame } from '../_shared/game-push.ts';
 import { applyGameEvent, REFUSAL_MESSAGE } from '../_shared/game-state.ts';
+import { replayClub } from '../_shared/replay.ts';
 import { callerProfileId, json, serve, serviceClient } from '../_shared/supabase.ts';
 import type { GameEvent } from '../../../src/domain/game-lifecycle.ts';
 
@@ -45,24 +47,23 @@ serve(async (request) => {
   }
 
   /*
-   * The game has moved; ratings have not. Replaying here rather than on a schedule is
-   * what makes a confirming player see the ladder change. A failure past this point
+   * The game has moved; ratings have not. Replaying here is what makes a confirming
+   * player see the ladder change. A failure past this point
    * leaves the record right and the ladder stale, which rating_replay_state shows, so
    * it is reported rather than turned into a failed confirmation the client retries.
    */
   let replayed = false;
   if (outcome.state.status === 'confirmed') {
-    const replay = await service.functions.invoke('replay-ratings');
-    if (replay.error !== null) console.error('replay after confirmation failed', replay.error);
-    replayed = replay.error === null;
+    const replay = await replayClub(service);
+    if (!replay.ok) console.error('replay after confirmation failed', replay.message);
+    replayed = replay.ok;
   }
 
   // The dispute stands whether or not the alert goes out; a lost one is only logged.
   if (outcome.state.status === 'disputed') {
-    const alert = await service.functions.invoke('notify-players', {
-      body: { gameId: body.gameId, kind: 'dispute' },
-    });
-    if (alert.error !== null) console.error('dispute alert failed', alert.error);
+    await announceGame(service, body.gameId, 'dispute').catch((error) =>
+      console.error('dispute alert failed', error),
+    );
   }
 
   return json({ status: outcome.state.status, replayed });

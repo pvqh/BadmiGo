@@ -87,7 +87,7 @@ record polices itself without anyone being appointed referee.
 23. As a confirming player, I want the notification or the banner to take me to the game, where one tap approves it, so that confirming never feels like a chore. (Web notifications on iPhone carry no action buttons, so approving from the notification itself is not possible.)
 24. As a player who disagrees with a logged score, I want to dispute it, so that a wrong result does not move my rating.
 25. As any participant in a disputed game, I want to be notified of the dispute, so that we can sort it out in person at the next session.
-26. As a club, we want games that nobody responded to to auto-accept after twenty-four hours, so that the ladder is not held hostage by one person who does not open the app.
+26. ~~As a club, we want games that nobody responded to to auto-accept after twenty-four hours, so that the ladder is not held hostage by one person who does not open the app.~~ Removed 2026-11-28: a forgotten test game was accepted by silence and moved four ratings on a result nobody had checked. A pending game now waits until its players answer, its logger cancels it (story 20), or an admin voids it; no clock settles it either way.
 27. As a player, I want pending games to move nobody's rating, so that the ladder only ever reflects agreed results.
 28. As a player with games awaiting my response, I want a banner when I open the app, so that I can clear them even if I missed the push.
 29. As a player, I want to see which of the other three have confirmed so far, so that I know whether a game is nearly settled.
@@ -151,11 +151,12 @@ Developer account: iOS gives web apps no widgets. Their numbers are not reused.
 67. As the admin, I want every correction to recompute all affected ratings automatically, so that I never hand-edit a rating.
 68. As the admin, I want to adjust a player's seed tier shortly after signup, so that an honest self-misjudgement can be fixed before it distorts anything.
 69. As the admin, I want to merge duplicate accounts, so that someone who signed up twice does not appear twice on the ladder.
-70. As the admin, I want to see flagged implausible activity, so that I can check anything that looks wrong.
+70. As the admin, I want to see flagged implausible activity, so that I can check anything that looks wrong. (Revised 2026-11-28: the flag is a dispute. The other flag, a game accepted by the clock with nobody but the logger vouching, went with story 26.)
 71. As the admin, I want a per-player daily cap on logged games, so that nobody can flood the ladder by accident or otherwise.
 72. As the admin, I want to appoint a second admin, so that corrections do not wait for me when I am away for a weekend.
 73. As a club player, I want every game to carry all four names publicly, so that the record polices itself.
 74. As a club player, I want to know that ratings cannot be computed or altered from a browser, so that a modified page cannot fake a ranking.
+79. As the admin, I want to delete a player account, so that an abandoned or mistaken account can be cleaned up. Only an account that has never played can be deleted, because every game is rating input for three other people; the admin voids its games first if it has any. An admin cannot delete their own account. (Added 2026-11-28.)
 
 ## Implementation Decisions
 
@@ -233,29 +234,31 @@ is explicitly untrusted and is never persisted.
   tier, and per-game deltas. No I/O, no dates from the system clock (time is passed
   in), no randomness.
 - **`domain/game-lifecycle`** — pure. A reducer over game state: `(state, event) ->
-  state`, covering pending → confirmed → disputed → voided, the twenty-four-hour
-  auto-accept, the logger's own implicit confirmation, and the cancel-while-pending
-  window.
+  state`, covering pending → confirmed → disputed → voided, the logger's own
+  implicit confirmation, and the cancel-while-pending window. No event is driven by
+  the clock.
 - **`domain/validation`** — pure. Badminton score validity per format (rally point,
   win by two, hard cap at 40 for a game to 31, 30 for a game to 21, 21 for a game to 15, and 15 for a
   game to 11), four distinct players, two per side.
 - **`domain/stats`** — pure. Win/loss, partner breakdown, head-to-head, and
   performance-vs-expectation derived from the same game list.
-- **`domain/flags`, `domain/recap`, `domain/overtaken`** — pure. Which games an
-  admin should look at (story 70), what a player's week came to (story 62), and who
-  a replay moved past whom on the ladder (story 63). Added 2026-11-24.
+- **`domain/recap`, `domain/overtaken`** — pure. What a player's week came to
+  (story 62), and who a replay moved past whom on the ladder (story 63). Added
+  2026-11-24. (`domain/flags` was removed 2026-11-28: with one flag left, a dispute,
+  it was a status check.)
 - **`data`** — the only module that talks to Supabase. Thin adapters; no business
   rules. Nothing above it imports the Supabase client directly.
 - **`ui`** — screens and components. Reads from `data`, formats output from
   `domain`. Contains no rules.
-- **Edge Functions** — `replay-ratings` (recompute and persist derived tables),
-  `confirm-game` (apply a confirmation event, trigger replay when a game becomes
-  confirmed), `auto-accept` (scheduled, sweeps games past the 24h window),
-  `notify-players` (web push to participants: confirmation requests and dispute
-  alerts), `weekly-recap` (scheduled, Sunday evening), `admin` (score correction,
-  void, resolve, seed tier, account merge and temporary password, each ending in a
-  replay where it changes rating input). `replay-ratings` also sends the opt-in
-  "passed on the ladder" push.
+- **Edge Functions** — `replay-ratings` (recompute and persist derived tables, on
+  request), `confirm-game` (apply a confirmation event, replay when a game becomes
+  confirmed, alert the four on a dispute), `notify-players` (web push to
+  participants: the confirmation request after logging), `weekly-recap` (scheduled,
+  Sunday evening), `admin` (score correction, void, resolve, seed tier, account
+  merge, account deletion and temporary password, each ending in a replay where it
+  changes rating input). Every replay also sends the opt-in "passed on the ladder"
+  push. A function never calls another function: the replay and the game pushes are
+  shared code each function runs itself.
 
 ### Data model
 
@@ -327,8 +330,7 @@ Push is standard Web Push through a service worker, with VAPID keys held as an E
 Function secret. iPhone delivers web push only to a web app added to the home screen,
 on iOS 16.4 or later, and only after the player grants permission from a tap inside
 the app. A player who never installs gets no push; the pending-games banner (story 28)
-is their path, and the twenty-four-hour auto-accept keeps the ladder moving either
-way. The service worker exists for push only; it does not cache the app for offline
+is their path. The service worker exists for push only; it does not cache the app for offline
 use.
 
 ### Scope and sequencing
@@ -386,8 +388,8 @@ is drifting.
   veteran); placement transition at exactly five games; seed tiers producing the
   expected initial order; inactivity inflating sigma; margin of victory having no
   effect; determinism, i.e. the same game list always yielding identical output.
-- **`domain/game-lifecycle`** — every state transition and every invalid one;
-  twenty-four-hour auto-accept including the exact boundary; a single dispute
+- **`domain/game-lifecycle`** — every state transition and every invalid one; a
+  single dispute
   freezing a game regardless of other confirmations; the logger counting as
   confirmed; cancel permitted while pending and refused once confirmed; voiding
   removing a game from the replay input.

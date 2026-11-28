@@ -1,8 +1,15 @@
 import { invoke, supabase, unwrap } from './client';
 import type { AdminAction } from './function-contract';
 
+/**
+ * The change is saved even when the replay after it fails, so that is said in words:
+ * a quiet "done" once left the ladder stale with nobody aware of it.
+ */
 export async function runAdminAction(body: AdminAction): Promise<void> {
-  await invoke('admin', body);
+  const { replayed } = await invoke<{ readonly replayed: boolean }>('admin', body);
+  if (!replayed && body.action !== 'reset-password') {
+    throw new Error('Đã lưu, nhưng chưa tính lại được bảng xếp hạng. Xem log của hàm admin trên Supabase.');
+  }
 }
 
 /** Story 72. Row-level security lets an admin change is_admin directly. */

@@ -152,7 +152,6 @@ src/domain/                THE PURE CORE — no I/O, no clock, no randomness
   game-lifecycle.ts        (state, event) -> state reducer
   validation.ts            badminton score validity, side shape
   stats.ts                 win/loss, partners, head-to-head, PvE
-  flags.ts                 which games an admin should look at
   recap.ts                 what a player's week came to
   overtaken.ts             who a replay moved past whom
   *.test.ts                behaviour through the interface
@@ -201,12 +200,13 @@ supabase/
     _shared/game-state.ts  read -> reduce -> compare-and-set, with retry
     _shared/push.ts        the one Web Push sender, preferences respected
     _shared/replay-input.ts  narrowing replay_input()'s json
-    confirm-game/          a participant's answer
-    admin/                 corrections, void, resolve, seed tier, merge, password
-    replay-ratings/        rebuild every rating; "passed you" pushes
-    auto-accept/           hourly sweep of the 24-hour window
+    _shared/replay.ts      the one replay, and its "passed you" pushes
+    _shared/game-push.ts   a game's confirmation request or dispute alert
+    confirm-game/          a participant's answer, then replay or dispute alert
+    admin/                 corrections, void, resolve, seed tier, merge, delete, password
+    replay-ratings/        a rebuild by hand
     weekly-recap/          Sunday evening, each player's week
-    notify-players/        the push for one game, behind one `kind`
+    notify-players/        the logger's confirmation request
 ```
 
 Nothing is over 300 lines.
@@ -299,7 +299,8 @@ applyEvent(state, event): { ok: true, state } | { ok: false, reason }
 ```
 
 States: `pending -> confirmed | disputed | voided`.
-Events: `confirm`, `dispute`, `cancel`, `void`, `resolve`, `elapse`.
+Events: `confirm`, `dispute`, `cancel`, `void`, `resolve`. None is driven by the clock:
+a pending game waits for its players, its logger's cancel, or an admin (2026-11-28).
 
 The rules, all of them:
 
@@ -310,12 +311,10 @@ The rules, all of them:
 - A game becomes `confirmed` only when every one of the four is `confirmed`.
 - **One dispute freezes the game immediately**, regardless of how many have already
   confirmed. A frozen game accepts only `resolve` (admin) or `void` (admin).
-- `elapse` auto-accepts at **exactly** 24 hours from `loggedAt`, sweeping every
-  outstanding participant to `confirmed`.
 - `cancel` belongs to the logger alone, and only while pending. Once confirmed, a
   rating has moved, so the only route is an admin void.
 - A **confirmed game cannot be disputed.** Admin correction or void is the only way
-  back, so auto-accept cannot be quietly undone after the ladder has already moved.
+  back, so an agreed result cannot be quietly undone after the ladder has moved.
 - A voided game rejects every event, including another void.
 
 It returns a **result union** rather than the spec's bare `(state, event) -> state`, so
@@ -384,17 +383,13 @@ holds it to the replay's own output on the same fixture — which is the single
 highest-value test in the repository, because it makes hard rule 3 cheap to keep
 rather than a thing you have to remember.
 
-### 5.7 `flags.ts`, `recap.ts`, `overtaken.ts` — what the notifications and admin read
+### 5.7 `recap.ts`, `overtaken.ts` — what the notifications read
 
-Three small pure functions added on 2026-11-24, each answering one question for a
-server function or a screen, so that the answer is tested here rather than buried in
-I/O code:
+Two small pure functions added on 2026-11-24, each answering one question for a
+server function, so that the answer is tested here rather than buried in I/O code.
+(A third, `flags.ts`, was deleted on 2026-11-28: with auto-accept gone its only flag
+was a dispute, and the admin's review list now simply reads the disputed games.)
 
-- **`flagFor(game)`** — why an admin should look at a game (story 70): `disputed`, or
-  `nobody-answered` when the 24-hour clock accepted it and no one but the logger ever
-  answered inside the window. It reads `AUTO_ACCEPT_MS` from the lifecycle rather than
-  restating it. Scores are not second-guessed. A game carries at most one flag, or
-  null.
 - **`recapFor(...)`** — a player's games, wins, and rating from first to last over
   whichever games the caller chose as the week (story 62), read from the replay's own
   per-game changes, never recomputed. Null for a player with none, so nobody is sent a
@@ -480,7 +475,7 @@ games
   score_a/_b     smallint, 0..40, must differ
   winning_side   GENERATED ALWAYS AS (score_a > score_b ? 'a' : 'b') STORED
   played_at      timestamptz default now()   <- the replay's ordering
-  created_at     timestamptz default now()   <- the auto-accept clock
+  created_at     timestamptz default now()   <- when it was logged
   status         game_status default 'pending'
   void_reason    text   -- present exactly when status = 'voided'
 
@@ -489,9 +484,8 @@ game_confirmations  (game_id, profile_id) pk, state, responded_at
 ```
 
 **`played_at` and `created_at` are two clocks on purpose.** The replay orders by
-`played_at`; the 24-hour auto-accept window runs from `created_at`. Keeping them
-separate means backdating a game could never shorten the twenty-four hours the other
-three have to answer.
+`played_at`, which is the server's clock; `created_at` is when it was logged. (It also
+ran the 24-hour auto-accept window until that was removed on 2026-11-28.)
 
 **`game_confirmations` carries two foreign keys to the same game**, and both are load
 bearing:
@@ -570,8 +564,7 @@ point at the caller, and endpoints are unreadable, so there is nothing to redire
 blindly.
 
 `current_role_name()` lives here: it returns `anon`, `authenticated` or `service_role`,
-and `notify-players`, `auto-accept` and `weekly-recap` use it to tell their callers
-apart.
+and `weekly-recap` uses it to refuse any caller but the scheduler.
 
 ### 6.5a Photos (`...130400_game_photos.sql`, removed by `...20261125120000_drop_game_photos.sql`)
 
@@ -613,8 +606,7 @@ other's row back to what they saw. On a mismatch it raises `serialization_failur
 It writes the game row and the confirmation rows **together**, so a reader can never
 catch a game marked confirmed with a participant still pending. `responded_at` uses
 `coalesce(existing, now())`, so re-persisting a state cannot move someone's original
-answer timestamp. (That is also what lets `src/domain/flags` tell an answer a player
-gave from one the 24-hour clock filled in.)
+answer timestamp.
 
 **`merge_profiles(keep, merge)`** (`...130300_merge_profiles.sql`) — story 69, service
 role only. Refuses if both accounts played in the same game; otherwise moves the
@@ -635,13 +627,13 @@ is all. Everything else is an RPC or a function.
 | `create_my_profile` | a signed-in username account | turns an account into a club member |
 | `log_game` | a club member | a game, 4 participants, 4 confirmations, atomically |
 | `confirm-game` | a participant | confirm / dispute / cancel, then replay |
-| `admin` | an admin (checked by the function) | correct, void, resolve, seed tier, merge, password |
-| `replay-ratings` | service role only | rebuild every rating from history |
-| `auto-accept` | service role only, hourly | sweep games past 24 hours |
+| `admin` | an admin (checked by the function) | correct, void, resolve, seed tier, merge, delete, password |
+| `replay-ratings` | service role only | rebuild every rating from history, by hand |
 | `weekly-recap` | service role only, weekly | each player's week, as a push |
-| `notify-players` | service role, or a participant of that game | the push for one game |
+| `notify-players` | a participant of that game | the confirmation request |
 | `persist_game_state` | service role only | record a lifecycle decision |
 | `merge_profiles` | service role only | move a duplicate's games to the kept account |
+| `delete_profile` | service role only | delete an account that has never played |
 | `replay_input` / `apply_replay` | service role only | read / write the derived tables |
 
 `games`, `game_participants`, `game_confirmations` and all three derived tables are
@@ -669,8 +661,8 @@ its authorization model:
   `notify-players`, which must act on behalf of a member who is not allowed to do the
   thing themselves, and so check the caller first.
 - **`callerClient(authorization)`** — anon key plus the caller's own bearer token, so
-  **the database decides** what the caller may do. Used by `replay-ratings`,
-  `auto-accept` and `weekly-recap`. Because the privileged work is granted to
+  **the database decides** what the caller may do. Used by `replay-ratings` and
+  `weekly-recap`. Because the privileged work is granted to
   `service_role` alone, these functions do not re-implement the permission check and
   *cannot forget to*. A club member with a perfectly valid token gets a 403.
 
@@ -739,20 +731,17 @@ One cast exists, `asJson`, and it is documented: the engine returns readonly
 interfaces that serialize exactly as the SQL expects, but an interface has no index
 signature so TypeScript will not call one `Json`.
 
-### `auto-accept` — the hourly sweep
+### No function calls another
 
-Checks `current_role_name() = 'service_role'` **up front**, because the first
-privileged call is deep inside the loop; without the early check a member would get a
-500 on the one run that had a ripe game and a 200 on every other.
-
-Then: every pending game is offered an `elapse` event and **the reducer decides which
-are ripe** — the twenty-four hours stay in the domain. One replay for the whole sweep.
-`replayed` in its answer is true only when a replay actually ran, because that is the
-field read out of `cron.job_run_details`.
+`confirm-game` and `admin` run the replay (`_shared/replay.ts`) and the dispute alert
+(`_shared/game-push.ts`) themselves. Until 2026-11-28 they called `replay-ratings` and
+`notify-players` over HTTP with the service key the platform hands a function, and the
+gateway answered 401 to it, so in production no confirmation or admin action rebuilt
+the ladder. The legacy JWT keys that call depended on are retired in early 2027 anyway.
 
 ### `weekly-recap` — Sunday evening
 
-Service role only, checked up front like `auto-accept`. Takes the last seven days of
+Service role only, checked up front with `current_role_name()`. Takes the last seven days of
 confirmed games from `replay_input()`, their rows from `rating_history`, and asks
 `src/domain/recap` what each player's week came to: games, wins, rating from first to
 last. A player who did not play is sent nothing.
@@ -765,13 +754,12 @@ last. A player who did not play is sent nothing.
 | `dispute` | all four | `dispute_alerts` |
 
 Each message carries the path of the game, and the service worker opens it on a tap.
-Two kinds of caller: the functions that settle a game hold the service role, and a
-member whose browser just logged a game asks for the confirmation request itself — and
-is allowed to, but only for a game they played in.
+The messages live in `_shared/game-push.ts`. `notify-players` is the route a member's
+browser uses after logging a game, allowed only for a game they played in;
+`confirm-game` sends the dispute alert itself.
 
-Neither `auto-accept`, `admin` nor `weekly-recap` has a scheduler of its own where it
-needs one: `docs/BACKEND.md` holds the `cron.schedule` + `vault.create_secret` SQL to
-run once against production.
+`weekly-recap` has no scheduler of its own: `docs/BACKEND.md` holds the
+`cron.schedule` + `vault.create_secret` SQL to run once against production.
 
 ---
 
@@ -879,8 +867,7 @@ Sockets would be a second staleness model to reason about.
   creates the first and the profile step the second — and modelling it explicitly is why
   there is no "is this an error or a new user?" conditional anywhere else.
 - **`game-row.ts`** — unpacking a feed row: lineup, winner, what it moved for one
-  player, how many still owe an answer, how long until auto-accept. It imports
-  `AUTO_ACCEPT_MS` from the domain rather than restating 24 hours.
+  player, how many still owe an answer.
 - **`player-stats.ts`** — assembles one player's profile numbers by calling
   `domain/stats` over the games that player appeared in. `startOfMonth` lives here
   because "games this month" (story 54) is a presentation window, not a rule.
@@ -1012,11 +999,9 @@ BROWSER                   POSTGRES                    EDGE               PUSH SE
 
 ### Nobody answers
 
-`pg_cron` fires hourly (`7 * * * *`) with the service role key from Vault ->
-`auto-accept` -> every pending game is offered `elapse` -> the reducer accepts only
-those past exactly 24 hours from `created_at` -> one replay for the whole sweep. The
-admin's review list then flags any such game where nobody but the logger ever answered
-(`src/domain/flags`).
+Nothing happens. The game stays pending, moves no rating, and sits in the banner of
+whoever still owes an answer until they answer, the logger cancels it, or an admin
+voids it.
 
 ### Signing up
 
@@ -1066,11 +1051,10 @@ no React Native transform.
 What is covered: surprise asymmetry; uncertainty asymmetry; the placement transition
 at *exactly* five games; seed tiers producing the expected initial order; inactivity
 inflating sigma; margin of victory having no effect; determinism; every lifecycle
-transition and every invalid one; the 24-hour boundary; a single dispute freezing a
+transition and every invalid one; a single dispute freezing a
 game regardless of other confirmations; valid and invalid scores for all three formats;
 partner breakdown and head-to-head against hand-computed fixtures; PvE near zero for a
-player who performs exactly as predicted, and unmovable by their own rating; the admin
-flags, including an answer one millisecond inside the 24-hour window; the weekly recap
+player who performs exactly as predicted, and unmovable by their own rating; the weekly recap
 over a window; and who passed whom, ties included.
 
 ### The simulation harness
@@ -1174,8 +1158,7 @@ OAuth provider is enabled; and every function is `verify_jwt = true`.
 
 **Built and working:** every story in the spec. The schema with RLS and storage;
 username sign-in; `log_game`; the full lifecycle through `confirm-game`; the `admin`
-function and its screens; `replay-ratings` with the overtaken alert; `auto-accept`;
-`weekly-recap`; `notify-players` over Web Push; the complete pure domain core; the
+function and its screens; the replay with the overtaken alert; `weekly-recap`; `notify-players` over Web Push; the complete pure domain core; the
 simulation harness; the end-to-end smoke check; and the screens: the ladder with its
 podium and men's/women's filter, the feed, the log flow with its live preview, the pending banner, profiles with the rating graph, settings, admin,
 home-screen install, and the GitHub Pages build.
@@ -1188,7 +1171,7 @@ message (checked against a local endpoint); real delivery to an iPhone needs the
 HTTPS site and a phone.
 
 **Needs doing once, outside the repository:** the hosted project, the first admin, the
-two cron schedules, and the GitHub Pages settings and variables. `manual.md` Parts
+the weekly-recap schedule, and the GitHub Pages settings and variables. `manual.md` Parts
 11–12 and `docs/BACKEND.md` "Going live".
 
 **Out of scope, and not to be built opportunistically:** monetisation of any kind;
@@ -1227,10 +1210,7 @@ From the 2026-11-04 review, fixed on 2026-11-24:
    replay that read its input before a second game was confirmed, and finishes after
    the replay that included it, leaves the ladder one game behind until the next
    replay. Rare at this volume, and it heals itself.
-2. **`auto-accept` spends three round-trips per pending game to re-learn "not yet".**
-   Filtering the query with `.lt('created_at', now - AUTO_ACCEPT_MS)` — importing the
-   constant from the domain — would keep the decision in the reducer while stopping it
-   from being asked forty times an hour to say no.
+2. *(Closed 2026-11-28: `auto-accept` is gone.)*
 3. **`logGame` ignores the result of asking for the confirmation push.** Correct as
    best-effort — the game is logged either way and the banner is the fallback — but a
    comment there would make it read as a decision.
@@ -1251,7 +1231,7 @@ Worth recording so it is not accidentally refactored away:
 - The derived-state architecture is held **honestly**. There is no code path that
   writes a rating outside a replay, and that is enforced by grants rather than by
   discipline — admin corrections included.
-- `replay-ratings`, `auto-accept` and `weekly-recap` running as their *caller* so the
+- `replay-ratings` and `weekly-recap` running as their *caller* so the
   database is the authorization, instead of re-checking permissions in TypeScript, is
   the right shape — and it is why one smoke assertion can prove it.
 - `persist_game_state`'s compare-and-set, with the domain reducer deciding and SQL only

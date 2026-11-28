@@ -12,7 +12,7 @@ import { useMember } from '../../src/ui/session';
 import { colour, font, layout, space } from '../../src/ui/theme';
 import { TIER_LABEL } from '../../src/ui/vocabulary';
 
-/** One member's account, as only an admin can change it (stories 5, 68, 69, 72). */
+/** One member's account, as only an admin can change it (stories 5, 68, 69, 72, 79). */
 export default function MemberAdmin() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -26,6 +26,7 @@ export default function MemberAdmin() {
   const [keep, setKeep] = useState<Member | null>(null);
   // A new seed tier replays the whole club, so a stray tap only proposes it.
   const [seedTier, setSeedTier] = useState<Tier | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   if (members.isPending) return <Pending />;
   if (members.isError) {
@@ -177,6 +178,37 @@ export default function MemberAdmin() {
           </View>
         )}
       </View>
+
+      {member.id === me.id ? null : (
+        <View style={layout.card}>
+          <Text style={font.heading}>Xoá tài khoản</Text>
+          <Text style={font.dim}>
+            Chỉ xoá được tài khoản chưa chơi trận nào. Nếu người này đã có trận, hãy gỡ các
+            trận đó trước.
+          </Text>
+          {deleting ? (
+            <View style={{ gap: space.row }}>
+              <Text style={font.body}>Xoá @{member.username}? Không thể hoàn tác.</Text>
+              <ButtonRow>
+                <Button
+                  busy={act.isPending}
+                  label="Xoá"
+                  onPress={() =>
+                    act.mutate(
+                      { action: 'delete-account', profileId: member.id },
+                      { onSuccess: () => router.back(), onSettled: () => setDeleting(false) },
+                    )
+                  }
+                  tone="danger"
+                />
+                <Button label="Thôi" onPress={() => setDeleting(false)} tone="quiet" />
+              </ButtonRow>
+            </View>
+          ) : (
+            <Button label="Xoá tài khoản" onPress={() => setDeleting(true)} tone="danger" />
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 }

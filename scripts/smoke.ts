@@ -87,7 +87,7 @@ async function main(): Promise<void> {
 
   await assertBrowserEdges(gameId, members);
 
-  await assertMerge(members, run);
+  await assertRemovingAccounts(members, run);
 
   await assertUsernameOnly(run);
 
@@ -150,11 +150,11 @@ async function assertAdminCorrects(gameId: string, members: readonly Member[]): 
 }
 
 /**
- * Story 69. A merge deletes the duplicate's login in the same transaction as its
- * profile, so the duplicate can never sign in again and make a fresh one.
+ * Stories 69 and 79. A merge or a delete removes the login in the same transaction
+ * as the profile, so it can never sign in again and make a fresh one.
  */
-async function assertMerge(members: readonly Member[], run: string): Promise<void> {
-  console.log('\nmerging a duplicate');
+async function assertRemovingAccounts(members: readonly Member[], run: string): Promise<void> {
+  console.log('\nmerging a duplicate, deleting an unused account');
   const [admin, , , left] = members;
 
   const sameGame = await call('/functions/v1/admin', {
@@ -175,6 +175,19 @@ async function assertMerge(members: readonly Member[], run: string): Promise<voi
     body: { email: `${duplicate.username}@users.badminton-ladder.invalid`, password: 'correct-horse-9' },
   });
   check(signIn.status === 400, 'and the duplicate can no longer sign in');
+
+  const played = await call('/functions/v1/admin', {
+    token: admin.token,
+    body: { action: 'delete-account', profileId: left.profileId },
+  });
+  check(played.status === 409, 'an account that has played is not deleted');
+
+  const unused = await register(2, `${run}_gone`);
+  const deleted = await call('/functions/v1/admin', {
+    token: admin.token,
+    body: { action: 'delete-account', profileId: unused.profileId },
+  });
+  check(deleted.status === 200, 'an admin can delete an account that never played');
 }
 
 /** Supabase Auth will make an account for any address; only a username one may join. */

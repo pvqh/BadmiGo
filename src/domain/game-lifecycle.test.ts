@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  AUTO_ACCEPT_MS,
   applyEvent,
   countsTowardRatings,
   openGame,
@@ -9,11 +8,10 @@ import {
   type Transition,
 } from './game-lifecycle';
 
-const LOGGED_AT = Date.UTC(2026, 10, 7, 14, 30);
 const PARTICIPANTS = ['ann', 'bo', 'cal', 'dee'] as const;
 
 function pending(): GameState {
-  return openGame({ logger: 'ann', participants: PARTICIPANTS, loggedAt: LOGGED_AT });
+  return openGame({ logger: 'ann', participants: PARTICIPANTS });
 }
 
 function expectOk(transition: Transition): GameState {
@@ -27,7 +25,10 @@ function stateWith(status: GameState['status']): GameState {
     case 'pending':
       return pending();
     case 'confirmed':
-      return expectOk(applyEvent(pending(), { kind: 'elapse', now: LOGGED_AT + AUTO_ACCEPT_MS }));
+      return ['bo', 'cal', 'dee'].reduce(
+        (game, profileId) => expectOk(applyEvent(game, { kind: 'confirm', profileId })),
+        pending(),
+      );
     case 'disputed':
       return expectOk(applyEvent(pending(), { kind: 'dispute', profileId: 'bo' }));
     case 'voided':
@@ -112,35 +113,6 @@ describe('disputing', () => {
   });
 });
 
-describe('auto-accept', () => {
-  it('refuses to sweep while the window is still open', () => {
-    expect(applyEvent(pending(), { kind: 'elapse', now: LOGGED_AT + AUTO_ACCEPT_MS - 1 })).toEqual({
-      ok: false,
-      reason: 'auto-accept-window-open',
-    });
-  });
-
-  it('accepts at exactly twenty-four hours', () => {
-    const game = expectOk(
-      applyEvent(pending(), { kind: 'elapse', now: LOGGED_AT + AUTO_ACCEPT_MS }),
-    );
-    expect(game.status).toBe('confirmed');
-    expect(game.confirmations).toEqual({
-      ann: 'confirmed',
-      bo: 'confirmed',
-      cal: 'confirmed',
-      dee: 'confirmed',
-    });
-  });
-
-  it('accepts only the participants who never responded', () => {
-    let game = expectOk(applyEvent(pending(), { kind: 'confirm', profileId: 'bo' }));
-    game = expectOk(applyEvent(game, { kind: 'elapse', now: LOGGED_AT + AUTO_ACCEPT_MS }));
-    expect(game.status).toBe('confirmed');
-    expect(game.confirmations.cal).toBe('confirmed');
-  });
-});
-
 describe('cancelling while pending', () => {
   it('lets the logger withdraw their own game', () => {
     const game = expectOk(applyEvent(pending(), { kind: 'cancel', profileId: 'ann' }));
@@ -192,7 +164,6 @@ describe('illegal transitions', () => {
     { kind: 'cancel', profileId: 'ann' },
     { kind: 'void', reason: 'any' },
     { kind: 'resolve' },
-    { kind: 'elapse', now: LOGGED_AT + AUTO_ACCEPT_MS },
   ];
 
   it.each(everyEvent)('a voided game accepts no $kind', (event) => {

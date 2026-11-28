@@ -42,12 +42,12 @@ Everything else is a function or an RPC:
 | `username_problem` / `username_available` | anyone | instant signup feedback |
 | `log_game` | a club member | a game, four participants, four confirmations, atomically |
 | `confirm-game` | a participant | confirm, dispute or cancel, then replay |
-| `admin` | an admin | correct, void, resolve, seed tier, merge, temporary password |
-| `replay-ratings` | service role | rebuild every rating from history; send "passed you" pushes |
-| `auto-accept` | service role, hourly | sweep games past twenty-four hours |
+| `admin` | an admin | correct, void, resolve, seed tier, merge, delete an unused account, temporary password, then replay |
+| `replay-ratings` | service role | rebuild every rating from history by hand; the functions above replay themselves |
 | `weekly-recap` | service role, Sunday evening | each player's week, as a push |
-| `notify-players` | service role, or a participant | the push for one game |
+| `notify-players` | a participant | the confirmation request for a game they logged |
 | `merge_profiles` | service role (via `admin`) | move a duplicate's games to the kept account |
+| `delete_profile` | service role (via `admin`) | delete an account that has never played |
 
 `games`, `game_participants`, `game_confirmations` and both derived tables are
 `select`-only for `authenticated`, and revoked entirely from `anon`.
@@ -109,8 +109,8 @@ reports as gone (404 or 410).
 | Kind | Sent by | Switch |
 |---|---|---|
 | Confirm a game | `notify-players`, asked for by the logger's browser | `confirmation_requests` |
-| A game was disputed | `notify-players`, from `confirm-game` | `dispute_alerts` |
-| You were passed | `replay-ratings`, from `src/domain/overtaken` | `overtaken_on_ladder` (off by default) |
+| A game was disputed | `confirm-game` | `dispute_alerts` |
+| You were passed | every replay, from `src/domain/overtaken` | `overtaken_on_ladder` (off by default) |
 | Your week | `weekly-recap`, from `src/domain/recap` | `weekly_recap` |
 
 A failed push never fails the thing that caused it: a replay that rebuilt the ladder
@@ -171,8 +171,8 @@ update public.profiles set is_admin = true where username = '<your username>';
 
 Every later admin is appointed from the app.
 
-**3. The schedules.** `auto-accept` (hourly) and `weekly-recap` (Sunday evening) have
-no scheduler of their own, and stories 26 and 62 do not work without one. They need
+**3. The schedule.** `weekly-recap` (Sunday evening) has no scheduler of its own, and
+story 62 does not work without one. It needs
 the project ref and the service role key, so they cannot be migrations. First turn on
 the `pg_cron` and `pg_net` extensions under Database → Extensions; the SQL below needs
 both. Then run this once against the production database:
@@ -180,18 +180,6 @@ both. Then run this once against the production database:
 ```sql
 select vault.create_secret('https://<ref>.supabase.co/functions/v1', 'functions_url');
 select vault.create_secret('<service-role-key>', 'service_role_key');
-
-select cron.schedule('auto-accept', '7 * * * *', $job$
-  select net.http_post(
-    url := (select decrypted_secret from vault.decrypted_secrets where name = 'functions_url')
-           || '/auto-accept',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' ||
-        (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')),
-    body := '{}'::jsonb
-  );
-$job$);
 
 -- 13:00 UTC on Sunday is 20:00 in Vietnam. Change the hour if the club is elsewhere.
 select cron.schedule('weekly-recap', '0 13 * * 0', $job$
@@ -207,8 +195,10 @@ select cron.schedule('weekly-recap', '0 13 * * 0', $job$
 $job$);
 ```
 
-Check they exist with `select jobname, schedule from cron.job;`, that they run with
-`select * from cron.job_run_details order by start_time desc limit 5;`, and that no
-game has been `pending` for more than a day.
+Check it exists with `select jobname, schedule from cron.job;` and that it runs with
+`select * from cron.job_run_details order by start_time desc limit 5;`.
+
+A project set up before 2026-11-28 also has an hourly `auto-accept` job. That function
+is gone, so remove the job once: `select cron.unschedule('auto-accept');`
 
 The web app itself is deployed by GitHub Actions; see the manual.

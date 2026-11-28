@@ -1,18 +1,11 @@
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { flagFor, type Flag } from '../../src/domain/flags';
 import { Pending, Problem } from '../../src/ui/components/async';
 import { GameCard } from '../../src/ui/components/game-card';
-import { toReviewedGame } from '../../src/ui/game-row';
-import { useMembers, useReviewGames } from '../../src/ui/queries';
+import { useDisputedGames, useMembers } from '../../src/ui/queries';
 import { useMember } from '../../src/ui/session';
 import { colour, font, layout, space } from '../../src/ui/theme';
 import { TIER_LABEL } from '../../src/ui/vocabulary';
-
-const FLAG_LABEL: Record<Flag, string> = {
-  disputed: 'Bị phản đối. Sửa tỉ số, giữ nguyên như đã ghi, hoặc gỡ trận.',
-  'nobody-answered': 'Tự xác nhận sau 24 giờ. Chỉ người ghi xác nhận trận này.',
-};
 
 /**
  * Story 70: what needs an admin's eye, then everyone in the club. Fixing a game
@@ -21,7 +14,7 @@ const FLAG_LABEL: Record<Flag, string> = {
 export default function ClubAdmin() {
   const router = useRouter();
   const me = useMember();
-  const review = useReviewGames();
+  const review = useDisputedGames();
   const members = useMembers();
   const now = Date.now();
 
@@ -33,20 +26,17 @@ export default function ClubAdmin() {
     return <Problem message={members.error.message} onRetry={() => void members.refetch()} />;
   }
 
-  const flagged = review.data.flatMap((row) => {
-    const flag = flagFor(toReviewedGame(row));
-    return flag === null ? [] : [{ row, flag }];
-  });
-
   return (
     <ScrollView contentContainerStyle={layout.page} style={layout.screen}>
       <Text style={font.heading}>Cần xem lại</Text>
-      {flagged.length === 0 ? (
-        <Text style={font.dim}>Không có gì cần xem trong tháng qua.</Text>
+      {review.data.length === 0 ? (
+        <Text style={font.dim}>Không có trận nào bị phản đối.</Text>
       ) : (
-        flagged.map(({ row, flag }) => (
+        review.data.map((row) => (
           <View key={row.id} style={{ gap: space.tight }}>
-            <Text style={[font.dim, { color: colour.pending, fontWeight: '600' }]}>{FLAG_LABEL[flag]}</Text>
+            <Text style={[font.dim, { color: colour.pending, fontWeight: '600' }]}>
+              Bị phản đối. Sửa tỉ số, giữ nguyên như đã ghi, hoặc gỡ trận.
+            </Text>
             <GameCard
               now={now}
               onPress={() => router.push(`/game/${row.id}`)}

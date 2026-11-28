@@ -2,7 +2,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { GameRow } from '../../data/games';
 import type { ProfileId } from '../../domain/types';
 import {
-  autoAcceptsIn,
   lineupOf,
   moveFor,
   stillToAnswer,
@@ -10,7 +9,7 @@ import {
   type Player,
 } from '../game-row';
 import { colour, font, layout, space } from '../theme';
-import { describeDeadline, describeDelta, describeWhen } from '../vocabulary';
+import { describeDelta, describeWhen } from '../vocabulary';
 import { StatusChip } from './badge';
 
 /**
@@ -46,7 +45,7 @@ export function GameCard({
 
       <Text style={[font.dim, { fontSize: 12 }]}>
         {row.status === 'pending'
-          ? `${4 - stillToAnswer(row)}/4 đã xác nhận, ${describeDeadline(autoAcceptsIn(row, now))}`
+          ? `${4 - stillToAnswer(row)}/4 đã xác nhận`
           : `${describeWhen(row.played_at, now)}, đánh tới ${row.format}`}
       </Text>
     </Pressable>

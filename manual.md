@@ -480,8 +480,8 @@ Click **Table Editor** in the left sidebar. The tables, in the order worth readi
 - `profiles` — one row per club member. Username, display name, gender, seed tier,
   admin flag. *Having a row here is what makes an account a club member.*
 - `games` — one row per badminton game. Scores, format, status, and
-  two timestamps: `played_at` (what the replay orders by) and `created_at` (what the
-  24-hour confirmation clock runs from).
+  two timestamps: `played_at` (what the replay orders by) and `created_at` (when it was
+  logged).
 - `game_participants` — exactly four rows per game: who played, on which side.
 - `game_confirmations` — exactly four rows per game: who has confirmed, disputed, or
   not answered yet.
@@ -574,11 +574,11 @@ If that loop works, the application works.
 update public.profiles set is_admin = true where username = '<your username>';
 ```
 
-Reload the page. Settings now has a link to **club admin**: flagged games (disputed, or
-accepted by the clock with nobody but the logger vouching for them) and every member.
-Open a game as an admin to correct its score, resolve a dispute, or remove it. Open a
-member to change their seed tier, make them an admin, set a temporary password, or
-merge a duplicate account into the one they keep.
+Reload the page. Settings now has a link to **club admin**: disputed games and every
+member. Open a game as an admin to correct its score, resolve a dispute, or remove it.
+Open a member to change their seed tier, make them an admin, set a temporary password,
+merge a duplicate account into the one they keep, or delete an account that has never
+played.
 
 Press `Ctrl+C` to stop the bundler.
 
@@ -769,18 +769,18 @@ update public.profiles set is_admin = true where username = '<your username>';
 Every admin after that is appointed in the app: *club admin → a member → Admin*. Appoint
 a second one early (story 72), so corrections do not wait when you are away.
 
-### 12.3 Schedule the hourly sweep and the Sunday recap — do not skip this
+### 12.3 Schedule the Sunday recap — do not skip this
 
-`auto-accept` and `weekly-recap` work perfectly and **nothing calls them.** Without a
-scheduler, a game nobody answers stays pending forever (story 26) and nobody gets a
-recap (story 62). They need the project ref and the service role key, so they cannot
-live in a migration.
+`weekly-recap` works perfectly and **nothing calls it.** Without a scheduler nobody
+gets a recap (story 62). It needs the project ref and the service role key, so it
+cannot live in a migration. (A game nobody answers stays pending on purpose: there is
+no hourly sweep since 2026-11-28.)
 
-Run the SQL under **"Going live → 3. The schedules"** in `docs/BACKEND.md`, **once**, in
+Run the SQL under **"Going live → 3. The schedule"** in `docs/BACKEND.md`, **once**, in
 the SQL Editor of your hosted project. The recap is set for Sunday 13:00 UTC, which is
 20:00 in Vietnam.
 
-Check they are firing:
+Check it is firing:
 
 ```sql
 select * from cron.job_run_details order by start_time desc limit 5;
@@ -811,8 +811,7 @@ Send everyone **<https://pvqh.github.io/BadmiGo/>**. Each player, on their iPhon
 4. In **Settings**, turns on **notifications on this phone** and allows them.
 
 Step 4 only works from the home-screen icon, and needs **iOS 16.4 or later**. A player
-who skips it still sees a banner for games waiting on them, and the 24-hour
-auto-accept keeps the ladder moving either way. A player who owes several answers
+who skips it still sees a banner for games waiting on them. A player who owes several answers
 after a session can clear them with **Confirm all** at the top of the Feed.
 
 **Test notifications yourself first**: turn them on, have someone log a game with you

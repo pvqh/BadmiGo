@@ -15,4 +15,5 @@ export type AdminAction =
   | { readonly action: 'resolve'; readonly gameId: string }
   | { readonly action: 'set-seed-tier'; readonly profileId: string; readonly seedTier: Tier }
   | { readonly action: 'merge'; readonly keepId: string; readonly mergeId: string }
-  | { readonly action: 'reset-password'; readonly profileId: string; readonly password: string };
+  | { readonly action: 'reset-password'; readonly profileId: string; readonly password: string }
+  | { readonly action: 'delete-account'; readonly profileId: string };

@@ -42,10 +42,9 @@ app/sign-in.tsx          and sign-up, create-profile (avatar, and a way back to
 Three rules shape all of it.
 
 **The screens contain no rules.** Score validity comes from
-`src/domain/validation`, the twenty-four-hour window from
-`src/domain/game-lifecycle`, placement and tier bands from
-`src/domain/rating-scale`, the stats from `src/domain/stats`, and what the admin
-should look at from `src/domain/flags`. A screen that needs a rule imports it; it
+`src/domain/validation`, what a game may do next from `src/domain/game-lifecycle`,
+placement and tier bands from `src/domain/rating-scale`, and the stats from
+`src/domain/stats`. A screen that needs a rule imports it; it
 never restates it.
 
 **No rating is computed here as an authority.** `src/domain/rating-preview` shows a
@@ -99,7 +98,7 @@ it caches nothing, so the app needs a connection.
 
 On an iPhone, notifications only work once the app is on the home screen, on iOS
 16.4 or later. Settings says so when that is the reason. A member who never turns
-them on still has the banner on the ladder, and the twenty-four-hour auto-accept.
+them on still has the banner on the ladder.
 
 ## What the cache does after a replay
 

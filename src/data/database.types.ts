@@ -242,6 +242,9 @@ isOneToOne: false
 "daily_log_cap":
 { Args: Record<PropertyKey, never>; Returns: number
                            },
+"delete_profile":
+{ Args: { "p_profile": string }; Returns: undefined
+                           },
 "is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },

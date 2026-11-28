@@ -67,14 +67,6 @@ export function dayKey(playedAt: string): number {
   return startOfDay(new Date(playedAt).getTime());
 }
 
-/** How long the other participants still have, for a pending game. */
-export function describeDeadline(remainingMs: number): string {
-  if (remainingMs <= 0) return 'đang tự xác nhận';
-  const hours = Math.floor(remainingMs / (60 * 60 * 1000));
-  if (hours >= 1) return `còn ${hours} giờ để trả lời`;
-  return `còn ${Math.max(1, Math.floor(remainingMs / 60_000))} phút để trả lời`;
-}
-
 function startOfDay(at: number): number {
   const date = new Date(at);
   date.setHours(0, 0, 0, 0);

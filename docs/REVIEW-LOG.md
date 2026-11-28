@@ -81,15 +81,18 @@ changing hands (`scripts/smoke-browser.ts`).
   - **How to check:**
     - `select jobname, schedule from cron.job;`
     - `select * from cron.job_run_details order by start_time desc limit 5;`
-    - and that no game in production has been `pending` for more than a day.
 
-- [ ] **B6. Check by hand that replays run in production.**
+- [x] **B6. Check by hand that replays run in production.**
   - **Why:** `confirm-game`, `admin` and `auto-accept` call `replay-ratings` through the
     gateway with `SUPABASE_SERVICE_ROLE_KEY`. That works only while the project still
     has legacy JWT keys turned on.
-  - **How to check:** read `rating_replay_state.last_replay_at` after confirming a game.
-  - **Note for later:** if Supabase's legacy API keys are ever turned off, every
-    function-to-function call and both cron jobs stop together.
+  - **Found 2026-11-28:** it did not work. The gateway answered 401, so a void and every
+    confirmation left the ladder stale; only the cron's own token got through.
+  - **Done:** `confirm-game` and `admin` now run the replay and the dispute alert
+    in-process (`_shared/replay.ts`, `_shared/game-push.ts`), and `auto-accept` is gone.
+  - **Still open:** the `weekly-recap` cron job sends the legacy service-role JWT from
+    Vault. Supabase retires legacy keys in early 2027, so before then the job needs the
+    new secret key and `weekly-recap` needs `verify_jwt = false` with its own check.
 
 - [x] **B7. The free tier pauses after a week of inactivity.** A holiday break (Tết)
   pauses the project, and the app then fails for everyone until it is restored by hand

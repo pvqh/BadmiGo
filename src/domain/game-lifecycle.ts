@@ -1,8 +1,5 @@
 import type { ProfileId } from './types.ts';
 
-/** A game nobody responded to is accepted, so one silent player cannot hold the ladder hostage. */
-export const AUTO_ACCEPT_MS = 24 * 60 * 60 * 1000;
-
 export const CANCELLED_BY_LOGGER = 'cancelled by the logger';
 
 export type GameStatus = 'pending' | 'confirmed' | 'disputed' | 'voided';
@@ -12,7 +9,6 @@ export type ConfirmationState = 'pending' | 'confirmed' | 'disputed';
 export interface GameState {
   readonly status: GameStatus;
   readonly logger: ProfileId;
-  readonly loggedAt: number;
   readonly confirmations: Readonly<Record<ProfileId, ConfirmationState>>;
   readonly voidReason?: string;
 }
@@ -27,8 +23,7 @@ export type GameEvent =
   | { readonly kind: 'dispute'; readonly profileId: ProfileId }
   | { readonly kind: 'cancel'; readonly profileId: ProfileId }
   | { readonly kind: 'void'; readonly reason: string }
-  | { readonly kind: 'resolve' }
-  | { readonly kind: 'elapse'; readonly now: number };
+  | { readonly kind: 'resolve' };
 
 export type RejectionReason =
   | 'not-a-participant'
@@ -36,7 +31,6 @@ export type RejectionReason =
   | 'already-confirmed'
   | 'not-the-logger'
   | 'not-disputed'
-  | 'auto-accept-window-open'
   | 'game-is-frozen'
   | 'game-is-voided';
 
@@ -50,7 +44,6 @@ const rejected = (reason: RejectionReason): Transition => ({ ok: false, reason }
 export function openGame(input: {
   readonly logger: ProfileId;
   readonly participants: readonly ProfileId[];
-  readonly loggedAt: number;
 }): GameState {
   const confirmations: Record<ProfileId, ConfirmationState> = {};
   for (const profileId of input.participants) {
@@ -59,7 +52,6 @@ export function openGame(input: {
   return {
     status: 'pending',
     logger: input.logger,
-    loggedAt: input.loggedAt,
     confirmations,
   };
 }
@@ -69,6 +61,11 @@ export function countsTowardRatings(state: GameState): boolean {
   return state.status === 'confirmed';
 }
 
+/**
+ * No clock settles a game. A pending one waits for its players, its logger's cancel,
+ * or an admin, because a game accepted by silence once moved the ladder on a result
+ * nobody had checked.
+ */
 export function applyEvent(state: GameState, event: GameEvent): Transition {
   if (state.status === 'voided') return rejected('game-is-voided');
 
@@ -95,10 +92,6 @@ export function applyEvent(state: GameState, event: GameEvent): Transition {
         : rejected('not-the-logger');
     case 'resolve':
       return rejected('not-disputed');
-    case 'elapse':
-      return event.now - state.loggedAt >= AUTO_ACCEPT_MS
-        ? accepted(autoAccept(state))
-        : rejected('auto-accept-window-open');
   }
 }
 
@@ -119,16 +112,4 @@ function respond(
 
   const settled = Object.values(confirmations).every((state) => state === 'confirmed');
   return accepted({ ...state, status: settled ? 'confirmed' : 'pending', confirmations });
-}
-
-/**
- * A dispute freezes the game the moment it arrives, so a still-pending game holds
- * no response other than pending or confirmed and every outstanding one can accept.
- */
-function autoAccept(state: GameState): GameState {
-  const confirmations: Record<ProfileId, ConfirmationState> = {};
-  for (const profileId of Object.keys(state.confirmations)) {
-    confirmations[profileId] = 'confirmed';
-  }
-  return { ...state, status: 'confirmed', confirmations };
 }

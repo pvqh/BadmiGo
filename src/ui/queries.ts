@@ -8,7 +8,7 @@ import {
   readFeed,
   readGame,
   readGamesFor,
-  readGamesForReview,
+  readDisputedGames,
   readMyPendingGames,
   Refused,
   searchFeed,
@@ -60,7 +60,7 @@ export const keys = {
   preferences: (profileId: ProfileId) => ['preferences', profileId] as const,
   push: ['push'] as const,
   members: ['members'] as const,
-  review: ['review'] as const,
+  disputed: ['disputed'] as const,
 };
 
 /**
@@ -184,15 +184,8 @@ export function useMembers() {
   return useQuery({ queryKey: keys.members, queryFn: readMembers });
 }
 
-/** A month back is as far as anyone at the club would still remember a game. */
-const REVIEW_DAYS = 30;
-
-export function useReviewGames() {
-  return useQuery({
-    queryKey: keys.review,
-    queryFn: () =>
-      readGamesForReview(new Date(Date.now() - REVIEW_DAYS * 24 * 60 * 60 * 1000).toISOString()),
-  });
+export function useDisputedGames() {
+  return useQuery({ queryKey: keys.disputed, queryFn: readDisputedGames });
 }
 
 /**

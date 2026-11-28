@@ -3,11 +3,12 @@ import type { GameEvent } from '../../../src/domain/game-lifecycle.ts';
 import { asGameFormat, asTier } from '../../../src/domain/types.ts';
 import { validateScore } from '../../../src/domain/validation.ts';
 import { applyGameEvent, REFUSAL_MESSAGE } from '../_shared/game-state.ts';
+import { replayClub } from '../_shared/replay.ts';
 import { callerProfileId, json, serve, serviceClient, type ServiceClient } from '../_shared/supabase.ts';
 
 /**
- * Everything an admin does that a club member's own token must not (stories 5 and
- * 65–69). The service role does the writing, so the caller is checked here first; and
+ * Everything an admin does that a club member's own token must not (stories 5,
+ * 65–69 and 79). The service role does the writing, so the caller is checked here first; and
  * every action that changes what the ratings are computed from ends in a replay, so an
  * admin never leaves the ladder stale (story 67).
  *
@@ -26,14 +27,19 @@ serve(async (request) => {
   const body = parse(await request.json().catch(() => null));
   if (body === null) return json({ error: 'Không có thao tác quản trị này' }, 400);
 
+  // An admin who deleted themselves could leave the club with no admin at all.
+  if (body.action === 'delete-account' && body.profileId === callerId) {
+    return json({ error: 'Bạn không thể tự xoá tài khoản của mình' }, 409);
+  }
+
   const problem = await perform(service, body);
   if (problem !== null) return json({ error: problem }, 409);
 
   if (body.action === 'reset-password') return json({ replayed: false });
 
-  const replay = await service.functions.invoke('replay-ratings');
-  if (replay.error !== null) console.error('replay after admin action failed', replay.error);
-  return json({ replayed: replay.error === null });
+  const replay = await replayClub(service);
+  if (!replay.ok) console.error('replay after admin action failed', replay.message);
+  return json({ replayed: replay.ok });
 });
 
 /** Null when done; otherwise the reason it was refused, in words for the admin. */
@@ -70,6 +76,8 @@ async function perform(service: ServiceClient, body: AdminAction): Promise<strin
       });
       return error === null ? null : error.message;
     }
+    case 'delete-account':
+      return deleteAccount(service, body.profileId);
   }
 }
 
@@ -80,6 +88,27 @@ async function applyEvent(
 ): Promise<string | null> {
   const outcome = await applyGameEvent(service, gameId, event);
   return outcome.ok ? null : REFUSAL_MESSAGE[outcome.reason];
+}
+
+/**
+ * Story 79. The database refuses anyone who has played, so only an account with no
+ * games goes. The picture is removed afterwards and is not worth failing over: an
+ * orphaned file is a few kilobytes, a half-deleted account is not.
+ */
+async function deleteAccount(service: ServiceClient, profileId: string): Promise<string | null> {
+  const profile = await service.from('profiles').select('avatar_path').eq('id', profileId).maybeSingle();
+  if (profile.error !== null) return profile.error.message;
+  if (profile.data === null) return 'Không tìm thấy tài khoản này';
+
+  const { error } = await service.rpc('delete_profile', { p_profile: profileId });
+  if (error !== null) return error.message;
+
+  const avatar = profile.data.avatar_path;
+  if (avatar !== null) {
+    const removed = await service.storage.from('avatars').remove([avatar]);
+    if (removed.error !== null) console.error('avatar of a deleted account not removed', removed.error);
+  }
+  return null;
 }
 
 /**
@@ -149,6 +178,10 @@ function parse(payload: unknown): AdminAction | null {
       const password = text('password');
       if (profileId === null || password === null || password.length < MIN_PASSWORD) return null;
       return { action: 'reset-password', profileId, password };
+    }
+    case 'delete-account': {
+      const profileId = text('profileId');
+      return profileId === null ? null : { action: 'delete-account', profileId };
     }
     default:
       return null;

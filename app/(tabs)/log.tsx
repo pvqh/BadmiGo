@@ -167,8 +167,8 @@ export default function LogGame() {
               <Text style={[font.body, { color: colour.courtInk, fontWeight: '600' }]}>Xem trận</Text>
             </View>
             <Text style={font.dim}>
-              Ba người còn lại có 24 giờ để xác nhận. Chơi tiếp với bốn người này? Chỉ cần
-              nhập tỉ số mới.
+              Trận tính điểm khi ba người còn lại xác nhận. Ghi nhầm thì bạn huỷ được trong lúc
+              chờ. Chơi tiếp với bốn người này? Chỉ cần nhập tỉ số mới.
             </Text>
             {logging.data.notified ? null : (
               <Text style={font.dim}>Chưa gửi được thông báo, hãy nhắc mọi người xác nhận.</Text>

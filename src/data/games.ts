@@ -173,16 +173,13 @@ export async function readMyPendingGames(profileId: ProfileId) {
   );
 }
 
-/**
- * What the admin reviews (story 70): every disputed game, and the confirmed games
- * logged since `since`. Which of them to flag is src/domain/flags' decision.
- */
-export async function readGamesForReview(since: string) {
+/** What the admin reviews (story 70): a disputed game stays frozen until one settles it. */
+export async function readDisputedGames() {
   return unwrap(
     await supabase
       .from('games')
       .select(FEED_SHAPE)
-      .or(`status.eq.disputed,and(status.eq.confirmed,created_at.gte.${since})`)
+      .eq('status', 'disputed')
       .order('created_at', { ascending: false }),
   );
 }

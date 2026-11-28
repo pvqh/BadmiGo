@@ -387,9 +387,6 @@ verify_jwt = true
 [functions.replay-ratings]
 verify_jwt = true
 
-[functions.auto-accept]
-verify_jwt = true
-
 [functions.notify-players]
 verify_jwt = true
 
