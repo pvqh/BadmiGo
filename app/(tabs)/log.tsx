@@ -149,7 +149,7 @@ export default function LogGame() {
         <Button
           busy={logging.isPending}
           disabled={!ready}
-          label={ready ? `Ghi trận ${scoreA}–${scoreB}` : stillNeeded(missing, scored, problems.length > 0)}
+          label={ready ? `Ghi trận` : stillNeeded(missing, scored, problems.length > 0)}
           onPress={submit}
         />
 
@@ -167,8 +167,7 @@ export default function LogGame() {
               <Text style={[font.body, { color: colour.courtInk, fontWeight: '600' }]}>Xem trận</Text>
             </View>
             <Text style={font.dim}>
-              Trận tính điểm khi ba người còn lại xác nhận. Ghi nhầm thì bạn huỷ được trong lúc
-              chờ. Chơi tiếp với bốn người này? Chỉ cần nhập tỉ số mới.
+              Trận sẽ được ghi nhận khi ba người còn lại xác nhận.
             </Text>
             {logging.data.notified ? null : (
               <Text style={font.dim}>Chưa gửi được thông báo, hãy nhắc mọi người xác nhận.</Text>

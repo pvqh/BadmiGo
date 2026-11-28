@@ -108,7 +108,7 @@ export function PlayerPicker({
                 <Text style={[font.body, { color: colour.courtInk, fontWeight: '600' }]}>Mời người mới</Text>
               </Pressable>
               {invite.data === 'copied' ? (
-                <Text style={font.dim}>Đã chép link. Gửi cho họ nhé.</Text>
+                <Text style={font.dim}>Đã sao chép link. Gửi cho họ nhé.</Text>
               ) : null}
               {invite.isError ? (
                 <Text style={[font.dim, { color: colour.down }]}>{invite.error.message}</Text>

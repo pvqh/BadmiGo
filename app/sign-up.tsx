@@ -28,7 +28,7 @@ export default function SignUp() {
           autoCapitalize="none"
           autoComplete="username"
           autoCorrect={false}
-          hint="3 đến 20 ký tự: chữ hoa, chữ thường, số và _ . - đều được. Khi đăng nhập không cần gõ đúng chữ hoa."
+          hint="Tên đăng nhập phải gồm ít nhất 3 ký tự"
           label="Tên đăng nhập"
           onChangeText={setHandle}
           placeholder={example}
@@ -39,7 +39,7 @@ export default function SignUp() {
         <Field
           autoCapitalize="none"
           autoComplete="new-password"
-          hint={`Ít nhất ${MIN_PASSWORD} ký tự. Nếu quên, admin sẽ cấp mật khẩu tạm.`}
+          hint={`Mật khẩu phải gồm ít nhất ${MIN_PASSWORD} ký tự. `}
           label="Mật khẩu"
           onChangeText={setPassword}
           placeholder="••••••••"

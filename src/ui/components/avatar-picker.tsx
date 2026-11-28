@@ -64,14 +64,14 @@ export function AvatarPicker({
           ) : (
             <>
               <Pressable accessibilityRole="button" hitSlop={8} onPress={choose}>
-                <Text style={style.action}>{hasPicture ? 'Đổi ảnh' : 'Chọn ảnh đại diện'}</Text>
+                <Text style={style.action}>{hasPicture ? 'Thay đổi ảnh đại diện' : 'Chọn ảnh đại diện'}</Text>
               </Pressable>
               {hasPicture ? (
                 <Pressable accessibilityRole="button" hitSlop={8} onPress={onRemove}>
-                  <Text style={[font.dim, { color: colour.down }]}>Bỏ ảnh</Text>
+                  <Text style={[font.dim, { color: colour.down }]}>Xóa ảnh đại diện</Text>
                 </Pressable>
               ) : (
-                <Text style={font.dim}>Không bắt buộc. Không có ảnh thì hiện chữ cái đầu.</Text>
+                <Text style={font.dim}></Text>
               )}
             </>
           )}

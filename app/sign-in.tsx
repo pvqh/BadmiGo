@@ -68,7 +68,7 @@ export default function SignIn() {
           </Link>
         </Text>
         <Text style={[font.dim, { textAlign: 'center', paddingTop: space.row }]}>
-          {'Quên mật khẩu?\nHãy báo admin để được cấp mật khẩu tạm.'}
+          {'Quên mật khẩu?\nHãy báo admin để được cấp lại mật khẩu .'}
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
